@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  COLLECTOR
+  RIDER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum CollectionRequestStatus {
+  PENDING
+  ACCEPTED
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  loginId      String     @unique @map("login_id")
+  passwordHash String     @map("password_hash")
+  role         UserRole
+  status       UserStatus @default(ACTIVE)
+
+  collector Collector?
+  rider     Rider?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Collector {
+  id             String @id @default(uuid()) @db.Uuid
+  userId         String @unique @map("user_id") @db.Uuid
+  fullName       String @map("full_name")
+  nic            String @unique
+  mobile         String
+  address        String
+  guardianName   String @map("guardian_name")
+  guardianMobile String @map("guardian_mobile")
+  qrToken        String @unique @map("qr_token")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  dailyAssignments   DailyAssignment[]
+  collectionRequests CollectionRequest[]
+  collections        Collection[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("collectors")
+}
+
+model Rider {
+  id       String @id @default(uuid()) @db.Uuid
+  userId   String @unique @map("user_id") @db.Uuid
+  fullName String @map("full_name")
+  nic      String @unique
+  mobile   String
+  address  String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  collectionRequests CollectionRequest[]
+  collections        Collection[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("riders")
+}
+
+model Vehicle {
+  id          String        @id @default(uuid()) @db.Uuid
+  vehicleCode String        @unique @map("vehicle_code")
+  vehicleType String        @map("vehicle_type")
+  status      VehicleStatus @default(ACTIVE)
+
+  collections Collection[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("vehicles")
+}
+
+model DailyAssignment {
+  id             String   @id @default(uuid()) @db.Uuid
+  collectorId    String   @map("collector_id") @db.Uuid
+  assignmentDate DateTime @map("assignment_date") @db.Date
+
+  collector Collector @relation(fields: [collectorId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([collectorId, assignmentDate])
+  @@index([assignmentDate])
+  @@map("daily_assignments")
+}
+
+model CollectionRequest {
+  id          String                  @id @default(uuid()) @db.Uuid
+  collectorId String                  @map("collector_id") @db.Uuid
+  riderId     String?                 @map("rider_id") @db.Uuid
+  latitude    Decimal                 @db.Decimal(10, 7)
+  longitude   Decimal                 @db.Decimal(10, 7)
+  status      CollectionRequestStatus @default(PENDING)
+
+  requestedAt DateTime  @default(now()) @map("requested_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  completedAt DateTime? @map("completed_at")
+  cancelledAt DateTime? @map("cancelled_at")
+
+  collector Collector @relation(fields: [collectorId], references: [id], onDelete: Restrict)
+  rider     Rider?    @relation(fields: [riderId], references: [id], onDelete: Restrict)
+
+  collection Collection?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([collectorId])
+  @@index([riderId])
+  @@map("collection_requests")
+}
+
+model Collection {
+  id                  String   @id @default(uuid()) @db.Uuid
+  collectionRequestId String   @unique @map("collection_request_id") @db.Uuid
+  collectorId         String   @map("collector_id") @db.Uuid
+  riderId             String   @map("rider_id") @db.Uuid
+  vehicleId           String   @map("vehicle_id") @db.Uuid
+  weightKg            Decimal  @map("weight_kg") @db.Decimal(10, 2)
+  collectedAt         DateTime @map("collected_at")
+
+  collectionRequest CollectionRequest @relation(fields: [collectionRequestId], references: [id], onDelete: Restrict)
+  collector         Collector         @relation(fields: [collectorId], references: [id], onDelete: Restrict)
+  rider             Rider             @relation(fields: [riderId], references: [id], onDelete: Restrict)
+  vehicle           Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([collectorId])
+  @@index([riderId])
+  @@index([vehicleId])
+  @@index([collectedAt])
+  @@map("collections")
+}
