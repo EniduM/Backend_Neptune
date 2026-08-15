@@ -151,7 +151,9 @@ export class RiderService {
           );
         }
         if (request.status !== 'ACCEPTED') {
-          throw new ConflictException('Only accepted requests can be completed');
+          throw new ConflictException(
+            'Only accepted requests can be completed',
+          );
         }
 
         const vehicle = await tx.vehicle.findUnique({
@@ -192,7 +194,9 @@ export class RiderService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw new ConflictException('Collection request has already been completed');
+        throw new ConflictException(
+          'Collection request has already been completed',
+        );
       }
 
       throw error;

@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -52,5 +53,14 @@ export class CollectorController {
   cancelCollectionRequest(@Req() request: Request, @Param('id') id: string) {
     const user = request.user as { id: string };
     return this.collectorService.cancelCollectionRequest(user.id, id);
+  }
+
+  @Get('leaderboard')
+  getLeaderboard(
+    @Req() request: Request,
+    @Query('period') period: string = 'month',
+  ) {
+    const user = request.user as { id: string };
+    return this.collectorService.getLeaderboard(user.id, period);
   }
 }

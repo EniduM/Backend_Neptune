@@ -6,6 +6,12 @@ import { CollectorModule } from './collector/collector.module';
 import { RiderModule } from './rider/rider.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, AdminModule, CollectorModule, RiderModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    AdminModule,
+    CollectorModule,
+    RiderModule,
+  ],
 })
 export class AppModule {}

@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -403,7 +407,9 @@ export class AdminService {
       return await this.prisma.dailyAssignment.update({
         where: { id },
         data: {
-          ...(dto.collectorId !== undefined ? { collectorId: dto.collectorId } : {}),
+          ...(dto.collectorId !== undefined
+            ? { collectorId: dto.collectorId }
+            : {}),
           ...(dto.assignmentDate !== undefined
             ? { assignmentDate: this.toAssignmentDate(dto.assignmentDate) }
             : {}),
@@ -480,7 +486,10 @@ export class AdminService {
     error: unknown,
     entity: 'Collector' | 'Rider' | 'Vehicle' | 'Assignment',
   ): never {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
       const target = Array.isArray(error.meta?.target)
         ? error.meta.target.join(',')
         : String(error.meta?.target ?? '');
@@ -507,7 +516,9 @@ export class AdminService {
         );
       }
 
-      throw new ConflictException(`A ${entity.toLowerCase()} with these details already exists`);
+      throw new ConflictException(
+        `A ${entity.toLowerCase()} with these details already exists`,
+      );
     }
 
     throw error;
