@@ -58,7 +58,7 @@ export class CollectorController {
   @Get('leaderboard')
   getLeaderboard(
     @Req() request: Request,
-    @Query('period') period: string = 'month',
+    @Query('period') period: string = 'all',
   ) {
     const user = request.user as { id: string };
     return this.collectorService.getLeaderboard(user.id, period);

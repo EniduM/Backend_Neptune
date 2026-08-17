@@ -97,6 +97,7 @@ const collectionRequestSelect = {
   latitude: true,
   longitude: true,
   status: true,
+  qrVerified: true,
   requestedAt: true,
   acceptedAt: true,
   completedAt: true,

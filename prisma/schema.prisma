@@ -125,6 +125,7 @@ model CollectionRequest {
   latitude    Decimal                 @db.Decimal(10, 7)
   longitude   Decimal                 @db.Decimal(10, 7)
   status      CollectionRequestStatus @default(PENDING)
+  qrVerified  Boolean                  @default(false) @map("qr_verified")
 
   requestedAt DateTime  @default(now()) @map("requested_at")
   acceptedAt  DateTime? @map("accepted_at")

@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,6 +16,7 @@ const requestSelect = {
   latitude: true,
   longitude: true,
   status: true,
+  qrVerified: true,
   requestedAt: true,
   acceptedAt: true,
   completedAt: true,
@@ -139,6 +141,7 @@ export class RiderService {
             collectorId: true,
             riderId: true,
             status: true,
+            qrVerified: true,
           },
         });
 
@@ -153,6 +156,11 @@ export class RiderService {
         if (request.status !== 'ACCEPTED') {
           throw new ConflictException(
             'Only accepted requests can be completed',
+          );
+        }
+        if (!request.qrVerified) {
+          throw new ConflictException(
+            'QR verification is required before completing a collection request',
           );
         }
 
@@ -201,6 +209,76 @@ export class RiderService {
 
       throw error;
     }
+  }
+
+  async verifyQrToken(userId: string, requestId: string, qrToken: string) {
+    const rider = await this.resolveRider(userId);
+
+    const request = await this.prisma.collectionRequest.findUnique({
+      where: { id: requestId },
+      select: { id: true, collectorId: true, riderId: true, status: true },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Collection request not found');
+    }
+    if (request.riderId !== rider.id) {
+      throw new ForbiddenException(
+        'This request was not accepted by the authenticated rider',
+      );
+    }
+    if (request.status !== 'ACCEPTED') {
+      throw new ConflictException('QR verification requires ACCEPTED status');
+    }
+
+    const collector = await this.prisma.collector.findUnique({
+      where: { id: request.collectorId },
+      select: { qrToken: true },
+    });
+
+    if (!collector || collector.qrToken !== qrToken) {
+      throw new UnauthorizedException('Invalid QR token');
+    }
+
+    const verifiedRequest = await this.prisma.collectionRequest.update({
+      where: { id: requestId },
+      data: { qrVerified: true },
+      select: {
+        id: true,
+        collectorId: true,
+        riderId: true,
+        latitude: true,
+        longitude: true,
+        status: true,
+        qrVerified: true,
+        requestedAt: true,
+        acceptedAt: true,
+        completedAt: true,
+        cancelledAt: true,
+        createdAt: true,
+        updatedAt: true,
+        collector: {
+          select: { id: true, fullName: true, mobile: true },
+        },
+      },
+    });
+
+    return verifiedRequest;
+  }
+
+  async findVehicles() {
+    return this.prisma.vehicle.findMany({
+      where: { status: 'ACTIVE' },
+      select: {
+        id: true,
+        vehicleCode: true,
+        vehicleType: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { vehicleCode: 'asc' },
+    });
   }
 
   private async resolveRider(userId: string) {

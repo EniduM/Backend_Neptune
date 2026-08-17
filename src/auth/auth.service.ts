@@ -45,4 +45,25 @@ export class AuthService {
       },
     };
   }
+
+  async getProfile(userId: string, role: string) {
+    const base = {
+      id: userId,
+      role,
+    };
+
+    if (role === 'COLLECTOR') {
+      const collector = await this.prisma.collector.findUnique({
+        where: { userId },
+        select: { qrToken: true },
+      });
+
+      return {
+        ...base,
+        qrToken: collector?.qrToken ?? null,
+      };
+    }
+
+    return base;
+  }
 }

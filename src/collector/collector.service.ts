@@ -32,6 +32,7 @@ const collectionRequestSelect = {
   latitude: true,
   longitude: true,
   status: true,
+  qrVerified: true,
   requestedAt: true,
   acceptedAt: true,
   completedAt: true,
@@ -61,6 +62,7 @@ const collectionRequestHistorySelect = {
   latitude: true,
   longitude: true,
   status: true,
+  qrVerified: true,
   requestedAt: true,
   acceptedAt: true,
   completedAt: true,
@@ -310,8 +312,8 @@ export class CollectorService {
   }
 
   private normalizePeriod(period?: string): 'month' | 'all' {
-    const normalized = String(period ?? 'month').toLowerCase();
-    return normalized === 'all' ? 'all' : 'month';
+    const normalized = String(period ?? 'all').toLowerCase();
+    return normalized === 'month' ? 'month' : 'all';
   }
 
   private async resolveCollector(userId: string) {

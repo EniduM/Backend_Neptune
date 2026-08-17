@@ -59,7 +59,7 @@ http://localhost:3000
 
 ### Production URL
 
-**Not yet available.** Deployment configuration is pending. Contact the backend team for production endpoint details.
+**Production**: https://neptune-backend-kappa.vercel.app
 
 ### Required Environment Variables
 
@@ -150,13 +150,24 @@ Authorization: Bearer <accessToken>
 
 **Successful Response** (200 OK):
 
+For COLLECTOR role:
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
-  "loginId": "COLLECTOR001",
-  "role": "COLLECTOR"
+  "role": "COLLECTOR",
+  "qrToken": "QR-COLLECTOR-002"
 }
 ```
+
+For ADMIN or RIDER role:
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "role": "RIDER"
+}
+```
+
+**Note**: The `qrToken` field is only included for COLLECTOR role. It is used by Riders to verify collector identity via QR scan.
 
 **Error Responses**:
 
@@ -902,6 +913,68 @@ Deleted Assignment object (same structure as GET)
 
 ---
 
+### GET /admin/leaderboard
+
+Get collector leaderboard ranked by total collection weight.
+
+**Method**: GET  
+**URL**: `/admin/leaderboard`  
+**Authentication**: JWT required  
+**Role**: ADMIN required  
+**Query Parameters**:
+
+- `period` (optional): `"all"` (default) or `"month"`
+
+**Aggregation**:
+
+Leaderboard data is computed in real-time from the `Collection` table. For each Collector with completed collections:
+
+- `totalWeightKg` = SUM of `weightKg` across all Collection records
+- `totalCollections` = COUNT of Collection records
+
+**Period Filtering**:
+
+- `period=all` (default): Includes all Collection records regardless of date
+- `period=month`: Only includes Collection records where `collectedAt` is within the current calendar month
+
+**Ranking**:
+
+- Primary: `totalWeightKg` descending
+- Secondary (tiebreak): `totalCollections` descending
+- Tertiary (tiebreak): `collectorId` ascending (alphabetical)
+
+**Successful Response** (200 OK):
+
+```json
+[
+  {
+    "collectorId": "660e8400-e29b-41d4-a716-446655440001",
+    "fullName": "John Smith",
+    "totalWeightKg": 125.5,
+    "totalCollections": 12,
+    "rank": 1
+  },
+  {
+    "collectorId": "660e8400-e29b-41d4-a716-446655440002",
+    "fullName": "Jane Doe",
+    "totalWeightKg": 87.3,
+    "totalCollections": 8,
+    "rank": 2
+  }
+]
+```
+
+**Empty Response** (200 OK):
+
+Returns `[]` when no Collection records exist. This is a valid successful response.
+
+**Error Responses**:
+
+- **401 Unauthorized**: No JWT
+- **403 Forbidden**: Not ADMIN role
+
+---
+
 ## Collector APIs
 
 All Collector endpoints require:
@@ -1136,6 +1209,59 @@ Cancel a Collection Request.
 
 ---
 
+### GET /collector/leaderboard
+
+Get collector leaderboard ranked by total collection weight.
+
+**Method**: GET  
+**URL**: `/collector/leaderboard`  
+**Authentication**: JWT required  
+**Role**: COLLECTOR required  
+**Query Parameters**:
+
+- `period` (optional): `"all"` (default) or `"month"`
+
+**Aggregation**:
+
+Same logic as the Admin leaderboard. Data is computed in real-time from the `Collection` table. Returns the full cross-collector leaderboard (not filtered to the requesting collector).
+
+**Period Filtering**:
+
+- `period=all` (default): All Collection records
+- `period=month`: Only current calendar month
+
+**Ranking**:
+
+- Primary: `totalWeightKg` descending
+- Secondary (tiebreak): `totalCollections` descending
+- Tertiary (tiebreak): `collectorId` ascending
+
+**Successful Response** (200 OK):
+
+```json
+[
+  {
+    "collectorId": "660e8400-e29b-41d4-a716-446655440001",
+    "fullName": "John Smith",
+    "totalWeightKg": 125.5,
+    "totalCollections": 12,
+    "rank": 1
+  }
+]
+```
+
+**Empty Response** (200 OK):
+
+Returns `[]` when no Collection records exist.
+
+**Error Responses**:
+
+- **401 Unauthorized**: No JWT
+- **403 Forbidden**: Not COLLECTOR role
+- **404 Not Found**: Collector profile not found
+
+---
+
 ## Rider APIs
 
 All Rider endpoints require:
@@ -1324,6 +1450,120 @@ Accept a pending Collection Request.
 
 ---
 
+### POST /rider/collection-requests/:id/verify-qr-token
+
+Verify a collector's QR token before completing a collection request.
+
+**Method**: POST  
+**URL**: `/rider/collection-requests/:id/verify-qr-token`  
+**Authentication**: JWT required  
+**Role**: RIDER required  
+**Parameters**:
+
+- `id`: Collection Request ID (UUID)
+
+**Request Body**:
+
+```json
+{
+  "qrToken": "QR-COLLECTOR-002"
+}
+```
+
+**Validation Rules**:
+
+- `qrToken`: Required, string, must match the collector's qrToken exactly
+
+**State Transition**:
+
+- Request must be in **ACCEPTED** status and owned by the authenticated Rider
+- Sets `qrVerified` to `true` on the CollectionRequest
+
+**Successful Response** (200 OK):
+
+```json
+{
+  "id": "aa0e8400-e29b-41d4-a716-446655440001",
+  "collectorId": "660e8400-e29b-41d4-a716-446655440001",
+  "riderId": "770e8400-e29b-41d4-a716-446655440001",
+  "latitude": 6.9271,
+  "longitude": 80.7744,
+  "status": "ACCEPTED",
+  "qrVerified": true,
+  "requestedAt": "2026-08-13T11:00:00Z",
+  "acceptedAt": "2026-08-13T11:15:00Z",
+  "completedAt": null,
+  "cancelledAt": null,
+  "createdAt": "2026-08-13T11:00:00Z",
+  "updatedAt": "2026-08-13T11:30:00Z",
+  "collector": {
+    "id": "660e8400-e29b-41d4-a716-446655440001",
+    "fullName": "John Smith",
+    "mobile": "0771234567"
+  }
+}
+```
+
+**Important**:
+
+- The `qrToken` must match the collector's QR token (set during collector creation by Admin)
+- Once `qrVerified` is `true`, the Rider can call `POST /rider/collection-requests/:id/complete`
+- QR verification is a **prerequisite** for collection completion — `complete` will return 409 if `qrVerified` is `false`
+
+**Error Responses**:
+
+- **401 Unauthorized**: No JWT or invalid QR token
+- **403 Forbidden**: Not RIDER role or request not assigned to this Rider
+- **404 Not Found**: Request not found
+- **409 Conflict**: Request is not in ACCEPTED status
+
+---
+
+### GET /rider/vehicles
+
+Get all active vehicles.
+
+**Method**: GET  
+**URL**: `/rider/vehicles`  
+**Authentication**: JWT required  
+**Role**: RIDER required
+
+**Purpose**: Riders need to select a vehicle when completing a collection request
+
+**Successful Response** (200 OK):
+
+```json
+[
+  {
+    "id": "880e8400-e29b-41d4-a716-446655440001",
+    "vehicleCode": "VEH-001",
+    "vehicleType": "Tricycle",
+    "status": "ACTIVE",
+    "createdAt": "2026-08-13T10:32:00Z",
+    "updatedAt": "2026-08-13T10:32:00Z"
+  },
+  {
+    "id": "880e8400-e29b-41d4-a716-446655440002",
+    "vehicleCode": "VEH-002",
+    "vehicleType": "Van",
+    "status": "ACTIVE",
+    "createdAt": "2026-08-13T10:32:00Z",
+    "updatedAt": "2026-08-13T10:32:00Z"
+  }
+]
+```
+
+**Filter**: Only vehicles with status `ACTIVE` are returned
+
+**Ordering**: By vehicleCode (ascending)
+
+**Error Responses**:
+
+- **401 Unauthorized**: No JWT
+- **403 Forbidden**: Not RIDER role
+
+---
+
 ### POST /rider/collection-requests/:id/complete
 
 Complete a Collection Request.
@@ -1353,6 +1593,7 @@ Complete a Collection Request.
 **State Transition**:
 
 - **ACCEPTED** → **COMPLETED**: ✅ Success (200)
+- **Precondition**: `qrVerified` must be `true` (use `POST /rider/collection-requests/:id/verify-qr-token` first)
 
 **Successful Response** (200 OK):
 
@@ -1430,6 +1671,12 @@ RIDER Browses pending requests (GET /rider/collection-requests)
 RIDER Accepts request (PATCH /rider/collection-requests/:id/accept)
     ↓
 Request Status: ACCEPTED
+    ↓
+RIDER Gets collector's QR token (GET /auth/me → qrToken for COLLECTOR)
+    ↓
+RIDER Verifies collector QR (POST /rider/collection-requests/:id/verify-qr-token)
+    ↓
+Request qrVerified: true
     ↓
 RIDER Completes collection (POST /rider/collection-requests/:id/complete)
     ↓
@@ -1594,9 +1841,15 @@ Tokens expire after 15 minutes. When you receive a 401 response:
    - Now assigned to you
 4. View your requests (GET /rider/collection-requests/my)
    - See all requests assigned to you
-5. Complete collection (POST /rider/collection-requests/:id/complete)
+5. Verify collector QR (POST /rider/collection-requests/:id/verify-qr-token)
+   - Scan collector's QR or enter QR token
+   - Requires ACCEPTED status and matching token
+6. Get available vehicles (GET /rider/vehicles)
+   - Select vehicle for collection
+7. Complete collection (POST /rider/collection-requests/:id/complete)
    - Provide vehicle and weight
    - Creates Collection record
+   - Requires qrVerified = true
 ```
 
 ### 4. Error Handling
@@ -1745,7 +1998,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 }
 ```
 
-### Rider: Accept and Complete Request
+### Rider: Accept, Verify, and Complete Request
 
 ```http
 POST /auth/login
@@ -1787,6 +2040,31 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
   "status": "ACCEPTED",
   "riderId": "rider-001"
 }
+
+---
+
+POST /rider/collection-requests/req-001/verify-qr-token
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+{
+  "qrToken": "QR-COLLECTOR-002"
+}
+
+→ 200 OK
+{
+  "id": "req-001",
+  "status": "ACCEPTED",
+  "qrVerified": true
+}
+
+---
+
+GET /rider/vehicles
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+
+→ 200 OK
+[
+  { "id": "veh-001", "vehicleCode": "VEH-001", "vehicleType": "Tricycle" }
+]
 
 ---
 
@@ -1938,40 +2216,44 @@ Collection
 
 ## API Quick Reference
 
-| Method     | Endpoint                                    | Role      | Purpose                    |
-| ---------- | ------------------------------------------- | --------- | -------------------------- |
-| **POST**   | `/auth/login`                               | -         | Authenticate and get token |
-| **GET**    | `/auth/me`                                  | Any       | Get current user info      |
-| **POST**   | `/admin/collectors`                         | ADMIN     | Create Collector           |
-| **GET**    | `/admin/collectors`                         | ADMIN     | List all Collectors        |
-| **GET**    | `/admin/collectors/:id`                     | ADMIN     | Get specific Collector     |
-| **PATCH**  | `/admin/collectors/:id`                     | ADMIN     | Update Collector           |
-| **PATCH**  | `/admin/collectors/:id/status`              | ADMIN     | Change Collector status    |
-| **POST**   | `/admin/riders`                             | ADMIN     | Create Rider               |
-| **GET**    | `/admin/riders`                             | ADMIN     | List all Riders            |
-| **GET**    | `/admin/riders/:id`                         | ADMIN     | Get specific Rider         |
-| **PATCH**  | `/admin/riders/:id`                         | ADMIN     | Update Rider               |
-| **PATCH**  | `/admin/riders/:id/status`                  | ADMIN     | Change Rider status        |
-| **POST**   | `/admin/vehicles`                           | ADMIN     | Create Vehicle             |
-| **GET**    | `/admin/vehicles`                           | ADMIN     | List all Vehicles          |
-| **GET**    | `/admin/vehicles/:id`                       | ADMIN     | Get specific Vehicle       |
-| **PATCH**  | `/admin/vehicles/:id`                       | ADMIN     | Update Vehicle             |
-| **PATCH**  | `/admin/vehicles/:id/status`                | ADMIN     | Change Vehicle status      |
-| **POST**   | `/admin/assignments`                        | ADMIN     | Create Daily Assignment    |
-| **GET**    | `/admin/assignments`                        | ADMIN     | List all Assignments       |
-| **GET**    | `/admin/assignments/:id`                    | ADMIN     | Get specific Assignment    |
-| **PATCH**  | `/admin/assignments/:id`                    | ADMIN     | Update Assignment          |
-| **DELETE** | `/admin/assignments/:id`                    | ADMIN     | Delete Assignment          |
-| **GET**    | `/collector/assignments/today`              | COLLECTOR | Get today's assignment     |
-| **POST**   | `/collector/collection-requests`            | COLLECTOR | Create collection request  |
-| **GET**    | `/collector/collection-requests`            | COLLECTOR | List own requests          |
-| **GET**    | `/collector/collection-requests/:id`        | COLLECTOR | Get specific request       |
-| **PATCH**  | `/collector/collection-requests/:id/cancel` | COLLECTOR | Cancel request             |
-| **GET**    | `/rider/collection-requests`                | RIDER     | List pending requests      |
-| **GET**    | `/rider/collection-requests/my`             | RIDER     | List assigned requests     |
-| **GET**    | `/rider/collection-requests/:id`            | RIDER     | Get specific request       |
-| **PATCH**  | `/rider/collection-requests/:id/accept`     | RIDER     | Accept request             |
-| **POST**   | `/rider/collection-requests/:id/complete`   | RIDER     | Complete collection        |
+| Method     | Endpoint                                        | Role      | Purpose                      |
+| ---------- | ----------------------------------------------- | --------- | ---------------------------- |
+| **POST**   | `/auth/login`                                   | -         | Authenticate and get token   |
+| **GET**    | `/auth/me`                                      | Any       | Get current user info        |
+| **POST**   | `/admin/collectors`                             | ADMIN     | Create Collector             |
+| **GET**    | `/admin/collectors`                             | ADMIN     | List all Collectors          |
+| **GET**    | `/admin/collectors/:id`                         | ADMIN     | Get specific Collector       |
+| **PATCH**  | `/admin/collectors/:id`                         | ADMIN     | Update Collector             |
+| **PATCH**  | `/admin/collectors/:id/status`                  | ADMIN     | Change Collector status      |
+| **POST**   | `/admin/riders`                                 | ADMIN     | Create Rider                 |
+| **GET**    | `/admin/riders`                                 | ADMIN     | List all Riders              |
+| **GET**    | `/admin/riders/:id`                             | ADMIN     | Get specific Rider           |
+| **PATCH**  | `/admin/riders/:id`                             | ADMIN     | Update Rider                 |
+| **PATCH**  | `/admin/riders/:id/status`                      | ADMIN     | Change Rider status          |
+| **POST**   | `/admin/vehicles`                               | ADMIN     | Create Vehicle               |
+| **GET**    | `/admin/vehicles`                               | ADMIN     | List all Vehicles            |
+| **GET**    | `/admin/vehicles/:id`                           | ADMIN     | Get specific Vehicle         |
+| **PATCH**  | `/admin/vehicles/:id`                           | ADMIN     | Update Vehicle               |
+| **PATCH**  | `/admin/vehicles/:id/status`                    | ADMIN     | Change Vehicle status        |
+| **POST**   | `/admin/assignments`                            | ADMIN     | Create Daily Assignment      |
+| **GET**    | `/admin/assignments`                            | ADMIN     | List all Assignments         |
+| **GET**    | `/admin/assignments/:id`                        | ADMIN     | Get specific Assignment      |
+| **PATCH**  | `/admin/assignments/:id`                        | ADMIN     | Update Assignment            |
+| **DELETE** | `/admin/assignments/:id`                        | ADMIN     | Delete Assignment            |
+| **GET**    | `/admin/leaderboard`                            | ADMIN     | Get collector leaderboard    |
+| **GET**    | `/collector/assignments/today`                  | COLLECTOR | Get today's assignment       |
+| **POST**   | `/collector/collection-requests`                | COLLECTOR | Create collection request    |
+| **GET**    | `/collector/collection-requests`                | COLLECTOR | List own requests            |
+| **GET**    | `/collector/collection-requests/:id`            | COLLECTOR | Get specific request         |
+| **PATCH**  | `/collector/collection-requests/:id/cancel`     | COLLECTOR | Cancel request               |
+| **GET**    | `/collector/leaderboard`                        | COLLECTOR | Get collector leaderboard     |
+| **GET**    | `/rider/collection-requests`                    | RIDER     | List pending requests        |
+| **GET**    | `/rider/collection-requests/my`                 | RIDER     | List assigned requests       |
+| **GET**    | `/rider/collection-requests/:id`                | RIDER     | Get specific request         |
+| **PATCH**  | `/rider/collection-requests/:id/accept`         | RIDER     | Accept request               |
+| **POST**   | `/rider/collection-requests/:id/verify-qr-token`| RIDER     | Verify collector QR token    |
+| **POST**   | `/rider/collection-requests/:id/complete`       | RIDER     | Complete collection          |
+| **GET**    | `/rider/vehicles`                               | RIDER     | List active vehicles         |
 
 ---
 
@@ -2058,6 +2340,12 @@ Opens at http://localhost:5555
 - [x] Collection workflow (PENDING → ACCEPTED → COMPLETED)
 - [x] Collection record creation (transactional)
 - [x] Request cancellation (PENDING → CANCELLED)
+- [x] QR token verification (rider verifies collector identity)
+- [x] QR verification gate on collection completion
+- [x] Rider vehicle selection (GET /rider/vehicles)
+- [x] Collector QR token exposure via /auth/me
+- [x] Collector leaderboard (personal stats)
+- [x] Admin leaderboard (all collectors ranking)
 - [x] Validation and error handling
 - [x] Database schema with relationships
 - [x] Password hashing (Argon2)
@@ -2076,11 +2364,11 @@ Opens at http://localhost:5555
 
 ### ⚠️ Production Deployment Status
 
-- [ ] Production database provisioned (pending)
-- [ ] Production JWT secret configured (pending)
-- [ ] SSL/HTTPS endpoint available (pending)
-- [ ] Production API URL documented (pending)
-- [ ] Deployment pipeline configured (pending)
+- [x] Production database provisioned (Supabase)
+- [x] Production JWT secret configured
+- [x] SSL/HTTPS endpoint available
+- [x] Production API URL documented
+- [ ] Deployment pipeline configured (pending CI/CD)
 - [ ] Load balancing configured (pending)
 - [ ] Monitoring/logging configured (pending)
 - [ ] Backup strategy implemented (pending)
@@ -2103,7 +2391,7 @@ Opens at http://localhost:5555
 All API endpoints are implemented, tested, and documented. Flutter developers can begin:
 
 1. **Collector Mobile App**: Login, view assignments, create requests, monitor status, cancel requests
-2. **Rider Mobile App**: Login, browse requests, accept requests, complete collections
+2. **Rider Mobile App**: Login, browse requests, accept requests, verify collector QR, select vehicles, complete collections
 
 ### Next Steps
 
@@ -2146,9 +2434,9 @@ Example: `550e8400-e29b-41d4-a716-446655440000`
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: 2026-08-13  
-**Backend Version**: 0.0.1  
+**Document Version**: 2.1  
+**Last Updated**: 2026-08-17  
+**Backend Version**: 0.0.2  
 **Status**: Production Ready for Flutter Integration
 
 ---

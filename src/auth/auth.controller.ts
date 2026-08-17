@@ -22,8 +22,9 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  getMe(@Req() request: Request) {
-    return request.user;
+  async getMe(@Req() request: Request) {
+    const user = request.user as { id: string; loginId: string; role: string };
+    return this.authService.getProfile(user.id, user.role);
   }
 
   @Get('admin-test')

@@ -13,6 +13,7 @@ import { JwtAuthGuard } from '../auth/jwt.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { CompleteCollectionRequestDto } from './dto/complete-collection-request.dto';
+import { VerifyQrTokenDto } from './dto/verify-qr-token.dto';
 import { RiderService } from './rider.service';
 
 @Controller('rider')
@@ -53,5 +54,20 @@ export class RiderController {
   ) {
     const user = request.user as { id: string };
     return this.riderService.completeRequest(user.id, id, dto);
+  }
+
+  @Post('collection-requests/:id/verify-qr-token')
+  verifyQrToken(
+    @Req() request: Request,
+    @Param('id') id: string,
+    @Body() dto: VerifyQrTokenDto,
+  ) {
+    const user = request.user as { id: string };
+    return this.riderService.verifyQrToken(user.id, id, dto.qrToken);
+  }
+
+  @Get('vehicles')
+  findVehicles() {
+    return this.riderService.findVehicles();
   }
 }
