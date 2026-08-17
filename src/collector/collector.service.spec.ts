@@ -89,6 +89,7 @@ describe('CollectorService', () => {
   });
 
   it('ranks collectors by completed weight across the requested period', async () => {
+    prisma.collector.findUnique.mockResolvedValue({ id: 'collector-1' });
     prisma.collection.groupBy.mockResolvedValue([
       {
         collectorId: 'collector-1',

@@ -615,6 +615,69 @@ export class AdminService {
     return Number(value.toString());
   }
 
+  async getLeaderboard(period?: string) {
+    const normalizedPeriod = this.normalizePeriod(period);
+    const now = new Date();
+    const since =
+      normalizedPeriod === 'month'
+        ? new Date(now.getFullYear(), now.getMonth(), 1)
+        : undefined;
+
+    const grouped = await this.prisma.collection.groupBy({
+      by: ['collectorId'],
+      where: since
+        ? {
+            collectedAt: {
+              gte: since,
+            },
+          }
+        : undefined,
+      _sum: {
+        weightKg: true,
+      },
+      _count: {
+        collectorId: true,
+      },
+    });
+
+    const collectorIds = grouped.map((entry) => entry.collectorId);
+    const collectors = collectorIds.length
+      ? await this.prisma.collector.findMany({
+          where: { id: { in: collectorIds } },
+          select: { id: true, fullName: true },
+        })
+      : [];
+
+    const byName = new Map(
+      collectors.map((collector) => [collector.id, collector.fullName]),
+    );
+
+    const leaderboard = grouped
+      .map((entry) => ({
+        collectorId: entry.collectorId,
+        fullName: byName.get(entry.collectorId) ?? 'Unknown Collector',
+        totalWeightKg: this.toNumber(entry._sum.weightKg ?? 0),
+        totalCollections: entry._count.collectorId ?? 0,
+      }))
+      .sort(
+        (a, b) =>
+          b.totalWeightKg - a.totalWeightKg ||
+          b.totalCollections - a.totalCollections ||
+          a.collectorId.localeCompare(b.collectorId),
+      )
+      .map((entry, index) => ({
+        ...entry,
+        rank: index + 1,
+      }));
+
+    return leaderboard;
+  }
+
+  private normalizePeriod(period?: string): 'month' | 'all' {
+    const normalized = String(period ?? 'all').toLowerCase();
+    return normalized === 'month' ? 'month' : 'all';
+  }
+
   private handleDatabaseError(
     error: unknown,
     entity: 'Collector' | 'Rider' | 'Vehicle' | 'Assignment',

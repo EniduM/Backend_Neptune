@@ -5,6 +5,7 @@ import { RidersController } from './riders.controller';
 import { VehiclesController } from './vehicles.controller';
 import { AssignmentsController } from './assignments.controller';
 import { CollectionRequestsController } from './collection-requests.controller';
+import { LeaderboardController } from './leaderboard.controller';
 
 @Module({
   controllers: [
@@ -13,6 +14,7 @@ import { CollectionRequestsController } from './collection-requests.controller';
     VehiclesController,
     AssignmentsController,
     CollectionRequestsController,
+    LeaderboardController,
   ],
   providers: [AdminService],
 })
