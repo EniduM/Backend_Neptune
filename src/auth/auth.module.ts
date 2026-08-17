@@ -9,9 +9,11 @@ import { RolesGuard } from './roles.guard';
   imports: [
     JwtModule.register({
       secret: process.env.JWT_SECRET,
+      signOptions: {
+        expiresIn: '15m',
+      },
     }),
   ],
-  
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, RolesGuard],
   exports: [AuthService],
