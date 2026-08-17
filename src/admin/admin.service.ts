@@ -90,6 +90,76 @@ const assignmentSelect = {
   },
 } as const;
 
+const collectionRequestSelect = {
+  id: true,
+  collectorId: true,
+  riderId: true,
+  latitude: true,
+  longitude: true,
+  status: true,
+  requestedAt: true,
+  acceptedAt: true,
+  completedAt: true,
+  cancelledAt: true,
+  createdAt: true,
+  updatedAt: true,
+  collector: {
+    select: {
+      id: true,
+      fullName: true,
+      nic: true,
+      mobile: true,
+      address: true,
+      user: {
+        select: {
+          id: true,
+          loginId: true,
+          role: true,
+          status: true,
+        },
+      },
+    },
+  },
+  rider: {
+    select: {
+      id: true,
+      fullName: true,
+      nic: true,
+      mobile: true,
+      address: true,
+      user: {
+        select: {
+          id: true,
+          loginId: true,
+          role: true,
+          status: true,
+        },
+      },
+    },
+  },
+  collection: {
+    select: {
+      id: true,
+      collectionRequestId: true,
+      collectorId: true,
+      riderId: true,
+      vehicleId: true,
+      weightKg: true,
+      collectedAt: true,
+      createdAt: true,
+      updatedAt: true,
+      vehicle: {
+        select: {
+          id: true,
+          vehicleCode: true,
+          vehicleType: true,
+          status: true,
+        },
+      },
+    },
+  },
+} as const;
+
 @Injectable()
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
@@ -430,6 +500,28 @@ export class AdminService {
     });
   }
 
+  async findAllCollectionRequests() {
+    const requests = await this.prisma.collectionRequest.findMany({
+      select: collectionRequestSelect,
+      orderBy: { requestedAt: 'desc' },
+    });
+
+    return requests.map((request) => this.serializeCollectionRequest(request));
+  }
+
+  async findCollectionRequest(id: string) {
+    const request = await this.prisma.collectionRequest.findUnique({
+      where: { id },
+      select: collectionRequestSelect,
+    });
+
+    if (!request) {
+      throw new NotFoundException('Collection request not found');
+    }
+
+    return this.serializeCollectionRequest(request);
+  }
+
   private async ensureCollectorExists(id: string) {
     const collector = await this.prisma.collector.findUnique({
       where: { id },
@@ -480,6 +572,47 @@ export class AdminService {
 
   private toAssignmentDate(value: string): Date {
     return new Date(`${value}T00:00:00.000Z`);
+  }
+
+  private serializeCollectionRequest<
+    T extends {
+      latitude: number | string | { toString(): string } | null;
+      longitude: number | string | { toString(): string } | null;
+      rider: unknown;
+      collection:
+        | {
+            weightKg: number | string | { toString(): string } | null;
+          }
+        | null;
+    },
+  >(request: T) {
+    return {
+      ...request,
+      latitude: this.toNumber(request.latitude),
+      longitude: this.toNumber(request.longitude),
+      rider: request.rider ?? null,
+      collection: request.collection
+        ? {
+            ...request.collection,
+            weightKg: this.toNumber(request.collection.weightKg),
+          }
+        : null,
+    };
+  }
+
+  private toNumber(
+    value: number | string | { toString(): string } | null | undefined,
+  ): number {
+    if (value === null || value === undefined) {
+      return 0;
+    }
+    if (typeof value === 'number') {
+      return Number(value);
+    }
+    if (typeof value === 'string') {
+      return Number(value);
+    }
+    return Number(value.toString());
   }
 
   private handleDatabaseError(

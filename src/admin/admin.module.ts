@@ -4,6 +4,7 @@ import { AdminService } from './admin.service';
 import { RidersController } from './riders.controller';
 import { VehiclesController } from './vehicles.controller';
 import { AssignmentsController } from './assignments.controller';
+import { CollectionRequestsController } from './collection-requests.controller';
 
 @Module({
   controllers: [
@@ -11,6 +12,7 @@ import { AssignmentsController } from './assignments.controller';
     RidersController,
     VehiclesController,
     AssignmentsController,
+    CollectionRequestsController,
   ],
   providers: [AdminService],
 })
