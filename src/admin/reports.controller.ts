@@ -6,6 +6,7 @@ import { AssignmentsReportQueryDto } from './dto/assignments-report-query.dto';
 import { CollectionRequestsReportQueryDto } from './dto/collection-requests-report-query.dto';
 import { CollectionsReportQueryDto } from './dto/collections-report-query.dto';
 import { CollectorsReportQueryDto } from './dto/collectors-report-query.dto';
+import { ReportsQueryDto } from './dto/reports-query.dto';
 import { RidersReportQueryDto } from './dto/riders-report-query.dto';
 import { VehiclesReportQueryDto } from './dto/vehicles-report-query.dto';
 import { ReportsService } from './reports.service';
@@ -15,6 +16,38 @@ import { ReportsService } from './reports.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
+
+  @Get()
+  reports(@Query() query: ReportsQueryDto) {
+    const { type, ...filters } = query;
+
+    switch (type) {
+      case 'collection':
+        return this.reportsService.getCollectionsReport(
+          filters as CollectionsReportQueryDto,
+        );
+      case 'request':
+        return this.reportsService.getCollectionRequestsReport(
+          filters as CollectionRequestsReportQueryDto,
+        );
+      case 'collector':
+        return this.reportsService.getCollectorsReport(
+          filters as CollectorsReportQueryDto,
+        );
+      case 'rider':
+        return this.reportsService.getRidersReport(
+          filters as RidersReportQueryDto,
+        );
+      case 'vehicle':
+        return this.reportsService.getVehiclesReport(
+          filters as VehiclesReportQueryDto,
+        );
+      case 'assignment':
+        return this.reportsService.getAssignmentsReport(
+          filters as AssignmentsReportQueryDto,
+        );
+    }
+  }
 
   @Get('collections')
   collectionsReport(@Query() query: CollectionsReportQueryDto) {
