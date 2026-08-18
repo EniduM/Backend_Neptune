@@ -47,9 +47,16 @@ export class AuthService {
   }
 
   async getProfile(userId: string, role: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { loginId: true, status: true },
+    });
+
     const base = {
       id: userId,
+      loginId: user?.loginId ?? null,
       role,
+      status: user?.status ?? null,
     };
 
     if (role === 'COLLECTOR') {
