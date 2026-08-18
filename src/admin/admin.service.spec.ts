@@ -231,16 +231,17 @@ describe('AdminService – vehicle assignment', () => {
   });
 });
 
-describe('AdminService – delete operations', () => {
+describe('AdminService – delete operations (cascade)', () => {
   let service: AdminService;
   let prisma: {
     collector: { findUnique: jest.Mock };
     rider: { findUnique: jest.Mock; delete: jest.Mock };
     vehicle: { findUnique: jest.Mock; delete: jest.Mock };
-    collectionRequest: { count: jest.Mock };
-    collection: { count: jest.Mock };
-    dailyAssignment: { count: jest.Mock };
+    collectionRequest: { findMany: jest.Mock; deleteMany: jest.Mock };
+    collection: { deleteMany: jest.Mock };
+    dailyAssignment: { deleteMany: jest.Mock };
     user: { delete: jest.Mock };
+    $transaction: jest.Mock;
   };
 
   beforeEach(() => {
@@ -248,12 +249,16 @@ describe('AdminService – delete operations', () => {
       collector: { findUnique: jest.fn() },
       rider: { findUnique: jest.fn(), delete: jest.fn() },
       vehicle: { findUnique: jest.fn(), delete: jest.fn() },
-      collectionRequest: { count: jest.fn() },
-      collection: { count: jest.fn() },
-      dailyAssignment: { count: jest.fn() },
+      collectionRequest: { findMany: jest.fn(), deleteMany: jest.fn() },
+      collection: { deleteMany: jest.fn() },
+      dailyAssignment: { deleteMany: jest.fn() },
       user: { delete: jest.fn() },
-      riderDelete: { delete: jest.fn() },
+      $transaction: jest.fn(),
     };
+    prisma.$transaction.mockImplementation(
+      async (callback: (tx: typeof prisma) => Promise<unknown>) =>
+        callback(prisma),
+    );
     service = new AdminService(prisma as never);
   });
 
@@ -266,66 +271,58 @@ describe('AdminService – delete operations', () => {
       );
     });
 
-    it('returns 409 when the collector has historical collections', async () => {
+    it('cascades collections, requests and assignments, then deletes the user', async () => {
       prisma.collector.findUnique.mockResolvedValue({
         id: 'c1',
         userId: 'u1',
       });
-      prisma.collection.count.mockResolvedValue(3);
-      prisma.collectionRequest.count.mockResolvedValue(0);
-      prisma.dailyAssignment.count.mockResolvedValue(0);
-
-      await expect(service.deleteCollector('c1')).rejects.toBeInstanceOf(
-        ConflictException,
-      );
-      expect(prisma.user.delete).not.toHaveBeenCalled();
-    });
-
-    it('returns 409 when the collector has collection requests', async () => {
-      prisma.collector.findUnique.mockResolvedValue({
-        id: 'c1',
-        userId: 'u1',
-      });
-      prisma.collection.count.mockResolvedValue(0);
-      prisma.collectionRequest.count.mockResolvedValue(1);
-      prisma.dailyAssignment.count.mockResolvedValue(0);
-
-      await expect(service.deleteCollector('c1')).rejects.toBeInstanceOf(
-        ConflictException,
-      );
-    });
-
-    it('returns 409 when the collector has assignments instead of cascading them away', async () => {
-      prisma.collector.findUnique.mockResolvedValue({
-        id: 'c1',
-        userId: 'u1',
-      });
-      prisma.collection.count.mockResolvedValue(0);
-      prisma.collectionRequest.count.mockResolvedValue(0);
-      prisma.dailyAssignment.count.mockResolvedValue(1);
-
-      await expect(service.deleteCollector('c1')).rejects.toBeInstanceOf(
-        ConflictException,
-      );
-      expect(prisma.user.delete).not.toHaveBeenCalled();
-    });
-
-    it('deletes only the user (and its collector record) when nothing references it', async () => {
-      prisma.collector.findUnique.mockResolvedValue({
-        id: 'c1',
-        userId: 'u1',
-      });
-      prisma.collection.count.mockResolvedValue(0);
-      prisma.collectionRequest.count.mockResolvedValue(0);
-      prisma.dailyAssignment.count.mockResolvedValue(0);
+      prisma.collectionRequest.findMany.mockResolvedValue([
+        { id: 'cr1' },
+        { id: 'cr2' },
+      ]);
+      prisma.collection.deleteMany.mockResolvedValue({ count: 2 });
+      prisma.collectionRequest.deleteMany.mockResolvedValue({ count: 2 });
+      prisma.dailyAssignment.deleteMany.mockResolvedValue({ count: 1 });
       prisma.user.delete.mockResolvedValue({ id: 'u1' });
 
       const result = await service.deleteCollector('c1');
 
+      expect(prisma.collection.deleteMany).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { collectorId: 'c1' },
+            { collectionRequestId: { in: ['cr1', 'cr2'] } },
+          ],
+        },
+      });
+      expect(prisma.collectionRequest.deleteMany).toHaveBeenCalledWith({
+        where: { collectorId: 'c1' },
+      });
+      expect(prisma.dailyAssignment.deleteMany).toHaveBeenCalledWith({
+        where: { collectorId: 'c1' },
+      });
       expect(prisma.user.delete).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'u1' } }),
       );
       expect(result).toEqual({ id: 'u1' });
+    });
+
+    it('skips the request-id OR arm when the collector has no requests', async () => {
+      prisma.collector.findUnique.mockResolvedValue({
+        id: 'c1',
+        userId: 'u1',
+      });
+      prisma.collectionRequest.findMany.mockResolvedValue([]);
+      prisma.collection.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.collectionRequest.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.dailyAssignment.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.user.delete.mockResolvedValue({ id: 'u1' });
+
+      await service.deleteCollector('c1');
+
+      expect(prisma.collection.deleteMany).toHaveBeenCalledWith({
+        where: { OR: [{ collectorId: 'c1' }] },
+      });
     });
   });
 
@@ -338,35 +335,23 @@ describe('AdminService – delete operations', () => {
       );
     });
 
-    it('returns 409 when the rider has historical collections', async () => {
+    it('cascades collections and requests, then deletes the rider without touching vehicles', async () => {
       prisma.rider.findUnique.mockResolvedValue({ id: 'r1', userId: 'u1' });
-      prisma.collection.count.mockResolvedValue(2);
-      prisma.collectionRequest.count.mockResolvedValue(0);
-
-      await expect(service.deleteRider('r1')).rejects.toBeInstanceOf(
-        ConflictException,
-      );
-      expect(prisma.rider.delete).not.toHaveBeenCalled();
-    });
-
-    it('returns 409 when the rider has collection requests', async () => {
-      prisma.rider.findUnique.mockResolvedValue({ id: 'r1', userId: 'u1' });
-      prisma.collection.count.mockResolvedValue(0);
-      prisma.collectionRequest.count.mockResolvedValue(4);
-
-      await expect(service.deleteRider('r1')).rejects.toBeInstanceOf(
-        ConflictException,
-      );
-    });
-
-    it('deletes the rider without touching the assigned vehicle', async () => {
-      prisma.rider.findUnique.mockResolvedValue({ id: 'r1', userId: 'u1' });
-      prisma.collection.count.mockResolvedValue(0);
-      prisma.collectionRequest.count.mockResolvedValue(0);
+      prisma.collectionRequest.findMany.mockResolvedValue([{ id: 'cr3' }]);
+      prisma.collection.deleteMany.mockResolvedValue({ count: 1 });
+      prisma.collectionRequest.deleteMany.mockResolvedValue({ count: 1 });
       prisma.rider.delete.mockResolvedValue({ id: 'r1' });
 
       const result = await service.deleteRider('r1');
 
+      expect(prisma.collection.deleteMany).toHaveBeenCalledWith({
+        where: {
+          OR: [{ riderId: 'r1' }, { collectionRequestId: { in: ['cr3'] } }],
+        },
+      });
+      expect(prisma.collectionRequest.deleteMany).toHaveBeenCalledWith({
+        where: { riderId: 'r1' },
+      });
       expect(prisma.rider.delete).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'r1' } }),
       );
@@ -384,29 +369,20 @@ describe('AdminService – delete operations', () => {
       );
     });
 
-    it('returns 409 when historical collections reference the vehicle', async () => {
+    it('cascades referencing collections, then deletes the vehicle without touching riders', async () => {
       prisma.vehicle.findUnique.mockResolvedValue({ id: 'v1' });
-      prisma.collection.count.mockResolvedValue(5);
-
-      await expect(service.deleteVehicle('v1')).rejects.toBeInstanceOf(
-        ConflictException,
-      );
-      expect(prisma.vehicle.delete).not.toHaveBeenCalled();
-    });
-
-    it('deletes the vehicle without deleting the assigned rider or any collections', async () => {
-      prisma.vehicle.findUnique.mockResolvedValue({ id: 'v1' });
-      prisma.collection.count.mockResolvedValue(0);
+      prisma.collection.deleteMany.mockResolvedValue({ count: 3 });
       prisma.vehicle.delete.mockResolvedValue({ id: 'v1' });
 
       const result = await service.deleteVehicle('v1');
 
+      expect(prisma.collection.deleteMany).toHaveBeenCalledWith({
+        where: { vehicleId: 'v1' },
+      });
       expect(prisma.vehicle.delete).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'v1' } }),
       );
-      expect(prisma.collection.count).toHaveBeenCalledWith({
-        where: { vehicleId: 'v1' },
-      });
+      expect(prisma.rider.delete).not.toHaveBeenCalled();
       expect(result).toEqual({ id: 'v1' });
     });
   });
