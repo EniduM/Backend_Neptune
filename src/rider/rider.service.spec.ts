@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import { RiderService } from './rider.service';
 
@@ -93,7 +94,13 @@ describe('RiderService', () => {
         status: 'ACTIVE',
       });
 
-      prisma.$transaction.mockImplementation(async (fn: (tx: typeof createTx extends () => infer R ? R : never) => Promise<unknown>) => fn(tx as never));
+      prisma.$transaction.mockImplementation(
+        async (
+          fn: (
+            tx: typeof createTx extends () => infer R ? R : never,
+          ) => Promise<unknown>,
+        ) => fn(tx as never),
+      );
 
       const result = await service.completeRequest('user-1', 'req-1', {
         vehicleId: 'vehicle-1',
@@ -134,7 +141,13 @@ describe('RiderService', () => {
         id: 'vehicle-1',
         status: 'ACTIVE',
       });
-      prisma.$transaction.mockImplementation(async (fn: (tx: typeof createTx extends () => infer R ? R : never) => Promise<unknown>) => fn(tx as never));
+      prisma.$transaction.mockImplementation(
+        async (
+          fn: (
+            tx: typeof createTx extends () => infer R ? R : never,
+          ) => Promise<unknown>,
+        ) => fn(tx as never),
+      );
 
       await expect(
         service.completeRequest('user-1', 'req-1', {
@@ -158,14 +171,22 @@ describe('RiderService', () => {
         id: 'vehicle-1',
         status: 'ACTIVE',
       });
-      prisma.$transaction.mockImplementation(async (fn: (tx: typeof createTx extends () => infer R ? R : never) => Promise<unknown>) => fn(tx as never));
+      prisma.$transaction.mockImplementation(
+        async (
+          fn: (
+            tx: typeof createTx extends () => infer R ? R : never,
+          ) => Promise<unknown>,
+        ) => fn(tx as never),
+      );
 
       await expect(
         service.completeRequest('user-2', 'req-1', {
           vehicleId: 'vehicle-1',
           weightKg: 10,
         }),
-      ).rejects.toThrow('This request was not accepted by the authenticated rider');
+      ).rejects.toThrow(
+        'This request was not accepted by the authenticated rider',
+      );
     });
 
     it('rejects completion when vehicle is inactive', async () => {
@@ -183,7 +204,13 @@ describe('RiderService', () => {
         id: 'vehicle-1',
         status: 'INACTIVE',
       });
-      prisma.$transaction.mockImplementation(async (fn: (tx: typeof createTx extends () => infer R ? R : never) => Promise<unknown>) => fn(tx as never));
+      prisma.$transaction.mockImplementation(
+        async (
+          fn: (
+            tx: typeof createTx extends () => infer R ? R : never,
+          ) => Promise<unknown>,
+        ) => fn(tx as never),
+      );
 
       await expect(
         service.completeRequest('user-1', 'req-1', {
@@ -205,7 +232,13 @@ describe('RiderService', () => {
         qrVerified: true,
       });
       prisma.vehicle.findUnique.mockResolvedValue(null);
-      prisma.$transaction.mockImplementation(async (fn: (tx: typeof createTx extends () => infer R ? R : never) => Promise<unknown>) => fn(tx as never));
+      prisma.$transaction.mockImplementation(
+        async (
+          fn: (
+            tx: typeof createTx extends () => infer R ? R : never,
+          ) => Promise<unknown>,
+        ) => fn(tx as never),
+      );
 
       await expect(
         service.completeRequest('user-1', 'req-1', {
@@ -224,7 +257,13 @@ describe('RiderService', () => {
         id: 'vehicle-1',
         status: 'ACTIVE',
       });
-      prisma.$transaction.mockImplementation(async (fn: (tx: typeof createTx extends () => infer R ? R : never) => Promise<unknown>) => fn(tx as never));
+      prisma.$transaction.mockImplementation(
+        async (
+          fn: (
+            tx: typeof createTx extends () => infer R ? R : never,
+          ) => Promise<unknown>,
+        ) => fn(tx as never),
+      );
 
       await expect(
         service.completeRequest('user-1', 'nonexistent', {
@@ -252,11 +291,21 @@ describe('RiderService', () => {
 
       const p2002Error = new Prisma.PrismaClientKnownRequestError(
         'Unique constraint',
-        { code: 'P2002', clientVersion: '0.0.0', meta: { target: ['collection_request_id'] } },
+        {
+          code: 'P2002',
+          clientVersion: '0.0.0',
+          meta: { target: ['collection_request_id'] },
+        },
       );
       tx.collection.create.mockRejectedValue(p2002Error);
 
-      prisma.$transaction.mockImplementation(async (fn: (tx: typeof createTx extends () => infer R ? R : never) => Promise<unknown>) => fn(tx as never));
+      prisma.$transaction.mockImplementation(
+        async (
+          fn: (
+            tx: typeof createTx extends () => infer R ? R : never,
+          ) => Promise<unknown>,
+        ) => fn(tx as never),
+      );
 
       await expect(
         service.completeRequest('user-1', 'req-1', {
@@ -281,31 +330,47 @@ describe('RiderService', () => {
         id: 'vehicle-1',
         status: 'ACTIVE',
       });
-      prisma.$transaction.mockImplementation(async (fn: (tx: typeof createTx extends () => infer R ? R : never) => Promise<unknown>) => fn(tx as never));
+      prisma.$transaction.mockImplementation(
+        async (
+          fn: (
+            tx: typeof createTx extends () => infer R ? R : never,
+          ) => Promise<unknown>,
+        ) => fn(tx as never),
+      );
 
       await expect(
         service.completeRequest('user-1', 'req-1', {
           vehicleId: 'vehicle-1',
           weightKg: 10,
         }),
-      ).rejects.toThrow('QR verification is required before completing a collection request');
+      ).rejects.toThrow(
+        'QR verification is required before completing a collection request',
+      );
     });
   });
 
   describe('acceptRequest', () => {
     it('assigns the rider and sets status to ACCEPTED', async () => {
       prisma.rider.findUnique.mockResolvedValue({ id: 'rider-1' });
-      prisma.collectionRequest.findUnique
-        .mockResolvedValueOnce({ id: 'req-1', status: 'PENDING' });
+      prisma.collectionRequest.findUnique.mockResolvedValueOnce({
+        id: 'req-1',
+        status: 'PENDING',
+      });
       prisma.collectionRequest.updateMany.mockResolvedValue({ count: 1 });
-      prisma.collectionRequest.findUnique
-        .mockResolvedValueOnce({ id: 'req-1', status: 'ACCEPTED', riderId: 'rider-1' });
+      prisma.collectionRequest.findUnique.mockResolvedValueOnce({
+        id: 'req-1',
+        status: 'ACCEPTED',
+        riderId: 'rider-1',
+      });
 
       const result = await service.acceptRequest('user-1', 'req-1');
 
       expect(prisma.collectionRequest.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: 'ACCEPTED', riderId: 'rider-1' }),
+          data: expect.objectContaining({
+            status: 'ACCEPTED',
+            riderId: 'rider-1',
+          }),
         }),
       );
       expect(result.status).toBe('ACCEPTED');
@@ -318,9 +383,9 @@ describe('RiderService', () => {
         status: 'ACCEPTED',
       });
 
-      await expect(
-        service.acceptRequest('user-1', 'req-1'),
-      ).rejects.toThrow('Only pending requests can be accepted');
+      await expect(service.acceptRequest('user-1', 'req-1')).rejects.toThrow(
+        'Only pending requests can be accepted',
+      );
     });
 
     it('rejects when request does not exist', async () => {
@@ -351,7 +416,11 @@ describe('RiderService', () => {
         status: 'ACCEPTED',
       });
 
-      const result = await service.verifyQrToken('user-1', 'req-1', 'QR-TOKEN-123');
+      const result = await service.verifyQrToken(
+        'user-1',
+        'req-1',
+        'QR-TOKEN-123',
+      );
 
       expect(prisma.collectionRequest.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -376,7 +445,26 @@ describe('RiderService', () => {
 
       await expect(
         service.verifyQrToken('user-1', 'req-1', 'WRONG-TOKEN'),
-      ).rejects.toThrow('Invalid QR token');
+      ).rejects.toThrow(
+        'QR token does not match the collector for this request',
+      );
+    });
+
+    it('rejects with a ConflictException when token does not match', async () => {
+      prisma.rider.findUnique.mockResolvedValue({ id: 'rider-1' });
+      prisma.collectionRequest.findUnique.mockResolvedValue({
+        id: 'req-1',
+        collectorId: 'collector-1',
+        riderId: 'rider-1',
+        status: 'ACCEPTED',
+      });
+      prisma.collector.findUnique.mockResolvedValue({
+        qrToken: 'QR-TOKEN-123',
+      });
+
+      await expect(
+        service.verifyQrToken('user-1', 'req-1', 'WRONG-TOKEN'),
+      ).rejects.toBeInstanceOf(ConflictException);
     });
 
     it('rejects when request is not in ACCEPTED status', async () => {
@@ -404,7 +492,9 @@ describe('RiderService', () => {
 
       await expect(
         service.verifyQrToken('user-2', 'req-1', 'QR-TOKEN-123'),
-      ).rejects.toThrow('This request was not accepted by the authenticated rider');
+      ).rejects.toThrow(
+        'This request was not accepted by the authenticated rider',
+      );
     });
 
     it('rejects when request does not exist', async () => {
@@ -420,8 +510,18 @@ describe('RiderService', () => {
   describe('findVehicles', () => {
     it('returns all active vehicles', async () => {
       prisma.vehicle.findMany.mockResolvedValue([
-        { id: 'v1', vehicleCode: 'VEH-001', vehicleType: 'Tricycle', status: 'ACTIVE' },
-        { id: 'v2', vehicleCode: 'VEH-002', vehicleType: 'Van', status: 'ACTIVE' },
+        {
+          id: 'v1',
+          vehicleCode: 'VEH-001',
+          vehicleType: 'Tricycle',
+          status: 'ACTIVE',
+        },
+        {
+          id: 'v2',
+          vehicleCode: 'VEH-002',
+          vehicleType: 'Van',
+          status: 'ACTIVE',
+        },
       ]);
 
       const result = await service.findVehicles();

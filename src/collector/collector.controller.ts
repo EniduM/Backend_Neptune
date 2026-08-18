@@ -22,6 +22,12 @@ import { CreateCollectionRequestDto } from './dto/create-collection-request.dto'
 export class CollectorController {
   constructor(private readonly collectorService: CollectorService) {}
 
+  @Get('me')
+  getMe(@Req() request: Request) {
+    const user = request.user as { id: string };
+    return this.collectorService.getMe(user.id);
+  }
+
   @Get('assignments/today')
   findTodayAssignment(@Req() request: Request) {
     const user = request.user as { id: string };

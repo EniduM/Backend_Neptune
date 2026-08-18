@@ -89,6 +89,23 @@ const collectionRequestHistorySelect = {
 export class CollectorService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getMe(userId: string) {
+    const collector = await this.prisma.collector.findUnique({
+      where: { userId },
+      select: { qrToken: true },
+    });
+
+    if (!collector) {
+      throw new NotFoundException('Collector not found');
+    }
+
+    return {
+      id: userId,
+      role: 'COLLECTOR',
+      qrToken: collector.qrToken,
+    };
+  }
+
   async findTodayAssignment(userId: string) {
     const collector = await this.prisma.collector.findUnique({
       where: { userId },

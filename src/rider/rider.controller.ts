@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -57,6 +59,7 @@ export class RiderController {
   }
 
   @Post('collection-requests/:id/verify-qr-token')
+  @HttpCode(HttpStatus.OK)
   verifyQrToken(
     @Req() request: Request,
     @Param('id') id: string,

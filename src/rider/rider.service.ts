@@ -3,8 +3,8 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
+import { timingSafeEqual } from 'crypto';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CompleteCollectionRequestDto } from './dto/complete-collection-request.dto';
@@ -236,8 +236,10 @@ export class RiderService {
       select: { qrToken: true },
     });
 
-    if (!collector || collector.qrToken !== qrToken) {
-      throw new UnauthorizedException('Invalid QR token');
+    if (!collector || !this.qrTokensMatch(collector.qrToken, qrToken)) {
+      throw new ConflictException(
+        'QR token does not match the collector for this request',
+      );
     }
 
     const verifiedRequest = await this.prisma.collectionRequest.update({
@@ -279,6 +281,15 @@ export class RiderService {
       },
       orderBy: { vehicleCode: 'asc' },
     });
+  }
+
+  private qrTokensMatch(expected: string, submitted: string): boolean {
+    const expectedBuffer = Buffer.from(expected);
+    const submittedBuffer = Buffer.from(submitted);
+    if (expectedBuffer.length !== submittedBuffer.length) {
+      return false;
+    }
+    return timingSafeEqual(expectedBuffer, submittedBuffer);
   }
 
   private async resolveRider(userId: string) {

@@ -35,6 +35,34 @@ describe('CollectorService', () => {
     service = new CollectorService(prisma as never);
   });
 
+  describe('getMe', () => {
+    it('returns the collector profile with qrToken', async () => {
+      prisma.collector.findUnique.mockResolvedValue({
+        qrToken: 'QR-TOKEN-123',
+      });
+
+      const result = await service.getMe('user-1');
+
+      expect(prisma.collector.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'user-1' },
+          select: { qrToken: true },
+        }),
+      );
+      expect(result).toEqual({
+        id: 'user-1',
+        role: 'COLLECTOR',
+        qrToken: 'QR-TOKEN-123',
+      });
+    });
+
+    it('throws NotFoundException when collector does not exist', async () => {
+      prisma.collector.findUnique.mockResolvedValue(null);
+
+      await expect(service.getMe('user-1')).rejects.toThrow(NotFoundException);
+    });
+  });
+
   describe('findCollectionRequests', () => {
     it('returns collector request history in the contract expected by Flutter', async () => {
       prisma.collector.findUnique.mockResolvedValue({ id: 'collector-1' });
@@ -301,9 +329,21 @@ describe('CollectorService', () => {
       const result = await service.getLeaderboard('user-1', 'all');
 
       expect(result).toHaveLength(3);
-      expect(result[0]).toMatchObject({ collectorId: 'c-a', rank: 1, totalWeightKg: 150 });
-      expect(result[1]).toMatchObject({ collectorId: 'c-b', rank: 2, totalWeightKg: 100 });
-      expect(result[2]).toMatchObject({ collectorId: 'c-c', rank: 3, totalWeightKg: 75 });
+      expect(result[0]).toMatchObject({
+        collectorId: 'c-a',
+        rank: 1,
+        totalWeightKg: 150,
+      });
+      expect(result[1]).toMatchObject({
+        collectorId: 'c-b',
+        rank: 2,
+        totalWeightKg: 100,
+      });
+      expect(result[2]).toMatchObject({
+        collectorId: 'c-c',
+        rank: 3,
+        totalWeightKg: 75,
+      });
     });
 
     it('exposes only safe fields (no qrToken, password, or private data)', async () => {
