@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -47,5 +48,10 @@ export class VehiclesController {
     @Body() dto: UpdateVehicleStatusDto,
   ) {
     return this.adminService.updateVehicleStatus(id, dto);
+  }
+
+  @Delete(':id')
+  deleteVehicle(@Param('id') id: string) {
+    return this.adminService.deleteVehicle(id);
   }
 }

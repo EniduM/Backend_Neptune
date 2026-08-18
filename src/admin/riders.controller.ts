@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -47,5 +48,10 @@ export class RidersController {
     @Body() dto: UpdateRiderStatusDto,
   ) {
     return this.adminService.updateRiderStatus(id, dto);
+  }
+
+  @Delete(':id')
+  deleteRider(@Param('id') id: string) {
+    return this.adminService.deleteRider(id);
   }
 }

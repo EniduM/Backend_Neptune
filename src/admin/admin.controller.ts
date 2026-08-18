@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -47,5 +48,10 @@ export class AdminController {
     @Body() dto: UpdateCollectorStatusDto,
   ) {
     return this.adminService.updateCollectorStatus(id, dto);
+  }
+
+  @Delete(':id')
+  deleteCollector(@Param('id') id: string) {
+    return this.adminService.deleteCollector(id);
   }
 }

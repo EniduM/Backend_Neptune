@@ -345,6 +345,35 @@ export class AdminService {
     });
   }
 
+  async deleteCollector(id: string) {
+    const collector = await this.ensureCollectorExists(id);
+    const [collections, collectionRequests, dailyAssignments] =
+      await Promise.all([
+        this.prisma.collection.count({ where: { collectorId: id } }),
+        this.prisma.collectionRequest.count({ where: { collectorId: id } }),
+        this.prisma.dailyAssignment.count({ where: { collectorId: id } }),
+      ]);
+
+    if (collections > 0 || collectionRequests > 0 || dailyAssignments > 0) {
+      throw new ConflictException(
+        'Collector cannot be deleted because they have related collection, request or assignment records',
+      );
+    }
+
+    return this.prisma.user.delete({
+      where: { id: collector.userId },
+      select: {
+        id: true,
+        loginId: true,
+        role: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        collector: { select: collectorSelect },
+      },
+    });
+  }
+
   async createRider(dto: CreateRiderDto) {
     if (dto.vehicleId !== undefined && dto.vehicleId !== null) {
       await this.validateAssignableVehicle(dto.vehicleId);
@@ -468,6 +497,26 @@ export class AdminService {
     });
   }
 
+  async deleteRider(id: string) {
+    const rider = await this.ensureRiderExists(id);
+
+    const [collections, collectionRequests] = await Promise.all([
+      this.prisma.collection.count({ where: { riderId: id } }),
+      this.prisma.collectionRequest.count({ where: { riderId: id } }),
+    ]);
+
+    if (collections > 0 || collectionRequests > 0) {
+      throw new ConflictException(
+        'Rider cannot be deleted because they have related collection or request records',
+      );
+    }
+
+    return this.prisma.rider.delete({
+      where: { id },
+      select: riderSelect,
+    });
+  }
+
   async createVehicle(dto: CreateVehicleDto) {
     try {
       return await this.prisma.vehicle.create({
@@ -522,6 +571,25 @@ export class AdminService {
     return this.prisma.vehicle.update({
       where: { id },
       data: { status: dto.status },
+      select: vehicleSelect,
+    });
+  }
+
+  async deleteVehicle(id: string) {
+    await this.ensureVehicleExists(id);
+
+    const collections = await this.prisma.collection.count({
+      where: { vehicleId: id },
+    });
+
+    if (collections > 0) {
+      throw new ConflictException(
+        'Vehicle cannot be deleted because historical collection records reference it',
+      );
+    }
+
+    return this.prisma.vehicle.delete({
+      where: { id },
       select: vehicleSelect,
     });
   }

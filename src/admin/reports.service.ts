@@ -11,6 +11,9 @@ import { VehiclesReportQueryDto } from './dto/vehicles-report-query.dto';
 const collectionRowSelect = {
   id: true,
   collectionRequestId: true,
+  collectorId: true,
+  riderId: true,
+  vehicleId: true,
   weightKg: true,
   collectedAt: true,
   collector: {
@@ -60,6 +63,7 @@ const collectionRequestRowSelect = {
 
 const assignmentRowSelect = {
   id: true,
+  collectorId: true,
   assignmentDate: true,
   createdAt: true,
   updatedAt: true,
@@ -173,6 +177,7 @@ export class ReportsService {
             nic: true,
             mobile: true,
             address: true,
+            createdAt: true,
             user: { select: { loginId: true, status: true } },
           },
           orderBy: { createdAt: 'desc' },
@@ -236,6 +241,7 @@ export class ReportsService {
             nic: true,
             mobile: true,
             address: true,
+            createdAt: true,
             vehicle: {
               select: { id: true, vehicleCode: true, vehicleType: true, status: true },
             },
@@ -302,6 +308,7 @@ export class ReportsService {
           vehicleCode: true,
           vehicleType: true,
           status: true,
+          createdAt: true,
           rider: {
             select: {
               id: true,

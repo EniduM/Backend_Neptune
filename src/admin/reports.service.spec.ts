@@ -58,6 +58,9 @@ describe('ReportsService – collections report', () => {
       {
         id: 'col1',
         collectionRequestId: 'cr1',
+        collectorId: 'c1',
+        riderId: 'r1',
+        vehicleId: 'v1',
         weightKg: decimal('12.50'),
         collectedAt: DAY('2026-08-10'),
         collector: { id: 'c1', fullName: 'Alice' },
@@ -74,6 +77,9 @@ describe('ReportsService – collections report', () => {
     const result = await service.getCollectionsReport({});
 
     expect(result.data[0].weightKg).toBe(12.5);
+    expect(result.data[0].collectorId).toBe('c1');
+    expect(result.data[0].riderId).toBe('r1');
+    expect(result.data[0].vehicleId).toBe('v1');
     expect(result.summary).toEqual({
       totalCount: 1,
       totalWeightKg: 12.5,
@@ -260,6 +266,7 @@ describe('ReportsService – collectors report', () => {
         nic: '1',
         mobile: '077',
         address: 'Kandy',
+        createdAt: DAY('2026-07-01'),
         user: { loginId: 'COL1', status: 'ACTIVE' },
       },
       {
@@ -268,6 +275,7 @@ describe('ReportsService – collectors report', () => {
         nic: '2',
         mobile: '078',
         address: 'Colombo',
+        createdAt: DAY('2026-07-02'),
         user: { loginId: 'COL2', status: 'ACTIVE' },
       },
     ]);
@@ -291,6 +299,7 @@ describe('ReportsService – collectors report', () => {
     expect(result.data[0]).toEqual(
       expect.objectContaining({
         id: 'c1',
+        createdAt: DAY('2026-07-01'),
         totalCollections: 4,
         totalWeightKg: 80,
         totalRequests: 6,
@@ -373,6 +382,7 @@ describe('ReportsService – riders report', () => {
         nic: '3',
         mobile: '079',
         address: 'Galle',
+        createdAt: DAY('2026-07-01'),
         vehicle: {
           id: 'v1',
           vehicleCode: 'Tuk 1',
@@ -396,6 +406,7 @@ describe('ReportsService – riders report', () => {
     const result = await service.getRidersReport({});
 
     expect(result.data[0].vehicle.vehicleCode).toBe('Tuk 1');
+    expect(result.data[0].createdAt).toEqual(DAY('2026-07-01'));
     expect(result.data[0]).toEqual(
       expect.objectContaining({
         totalCollections: 2,
@@ -437,6 +448,7 @@ describe('ReportsService – vehicles report', () => {
         vehicleCode: 'Tuk 1',
         vehicleType: 'Tuk',
         status: 'ACTIVE',
+        createdAt: DAY('2026-07-01'),
         rider: { id: 'r1', fullName: 'Bob', user: { loginId: 'RD1' } },
       },
     ]);
@@ -454,6 +466,7 @@ describe('ReportsService – vehicles report', () => {
     expect(result.data[0]).toEqual(
       expect.objectContaining({
         vehicleCode: 'Tuk 1',
+        createdAt: DAY('2026-07-01'),
         rider: { id: 'r1', fullName: 'Bob', user: { loginId: 'RD1' } },
         totalCollections: 7,
         totalWeightKg: 140,
@@ -510,6 +523,7 @@ describe('ReportsService – assignments report', () => {
     prisma.dailyAssignment.findMany.mockResolvedValue([
       {
         id: 'a1',
+        collectorId: 'c1',
         assignmentDate: DAY('2026-08-10'),
         createdAt: DAY('2026-08-09'),
         updatedAt: DAY('2026-08-09'),
@@ -520,6 +534,7 @@ describe('ReportsService – assignments report', () => {
     const result = await service.getAssignmentsReport({});
 
     expect(result.data[0].collector.fullName).toBe('Alice');
+    expect(result.data[0].collectorId).toBe('c1');
     expect(result.summary.totalCount).toBe(1);
   });
 
