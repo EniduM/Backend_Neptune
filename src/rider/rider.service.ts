@@ -47,6 +47,7 @@ const collectionSelect = {
       id: true,
       vehicleCode: true,
       vehicleType: true,
+      status: true,
     },
   },
 } as const;
@@ -276,8 +277,6 @@ export class RiderService {
         vehicleCode: true,
         vehicleType: true,
         status: true,
-        createdAt: true,
-        updatedAt: true,
       },
       orderBy: { vehicleCode: 'asc' },
     });

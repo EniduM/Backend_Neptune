@@ -9,6 +9,7 @@ async function bootstrap() {
   app.enableCors({
     origin: (origin, callback) => {
       const explicitOrigins = [
+        'http://localhost:3000',
         'http://localhost:5173',
         'https://neptune-admin.vercel.app',
         'https://neptunefrontend2.vercel.app',
