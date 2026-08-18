@@ -11,6 +11,8 @@ async function bootstrap() {
       'http://localhost:5173',
       'https://neptune-admin.vercel.app',
       'https://neptunefrontend2.vercel.app',
+      'https://web-two-ebon-72.vercel.app',
+      'https://web-az4j3jhn7-enidu-maluddeniyas-projects.vercel.app',
     ],
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
