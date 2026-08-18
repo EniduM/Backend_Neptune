@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class CreateCollectorDto {
   @IsString()
@@ -41,8 +47,9 @@ export class CreateCollectorDto {
   @MaxLength(30)
   guardianMobile: string;
 
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
-  qrToken: string;
+  qrToken?: string;
 }

@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
+import { randomBytes } from 'crypto';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCollectorDto } from './dto/create-collector.dto';
@@ -182,7 +183,7 @@ export class AdminService {
               address: dto.address,
               guardianName: dto.guardianName,
               guardianMobile: dto.guardianMobile,
-              qrToken: dto.qrToken,
+              qrToken: dto.qrToken ?? this.generateQrToken(),
             },
           },
         },
@@ -199,6 +200,10 @@ export class AdminService {
     } catch (error) {
       this.handleDatabaseError(error, 'Collector');
     }
+  }
+
+  private generateQrToken(): string {
+    return `QR-${randomBytes(6).toString('hex').toUpperCase()}`;
   }
 
   async findAllCollectors() {
