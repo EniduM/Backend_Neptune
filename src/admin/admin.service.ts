@@ -171,6 +171,68 @@ const collectionRequestSelect = {
   },
 } as const;
 
+const collectionSelect = {
+  id: true,
+  collectionRequestId: true,
+  collectorId: true,
+  riderId: true,
+  vehicleId: true,
+  weightKg: true,
+  collectedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  collector: {
+    select: {
+      id: true,
+      fullName: true,
+      nic: true,
+      mobile: true,
+      address: true,
+      user: {
+        select: {
+          id: true,
+          loginId: true,
+          role: true,
+          status: true,
+        },
+      },
+    },
+  },
+  rider: {
+    select: {
+      id: true,
+      fullName: true,
+      nic: true,
+      mobile: true,
+      address: true,
+      user: {
+        select: {
+          id: true,
+          loginId: true,
+          role: true,
+          status: true,
+        },
+      },
+    },
+  },
+  vehicle: {
+    select: {
+      id: true,
+      vehicleCode: true,
+      vehicleType: true,
+      status: true,
+    },
+  },
+  collectionRequest: {
+    select: {
+      id: true,
+      status: true,
+      qrVerified: true,
+      requestedAt: true,
+    },
+  },
+} as const;
+
 @Injectable()
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
@@ -554,6 +616,37 @@ export class AdminService {
     }
 
     return this.serializeCollectionRequest(request);
+  }
+
+  async findAllCollections() {
+    const collections = await this.prisma.collection.findMany({
+      select: collectionSelect,
+      orderBy: { collectedAt: 'desc' },
+    });
+
+    return collections.map((collection) => this.serializeCollection(collection));
+  }
+
+  async findCollection(id: string) {
+    const collection = await this.prisma.collection.findUnique({
+      where: { id },
+      select: collectionSelect,
+    });
+
+    if (!collection) {
+      throw new NotFoundException('Collection not found');
+    }
+
+    return this.serializeCollection(collection);
+  }
+
+  private serializeCollection<T extends { weightKg: number | string | { toString(): string } }>(
+    collection: T,
+  ) {
+    return {
+      ...collection,
+      weightKg: this.toNumber(collection.weightKg),
+    };
   }
 
   private async ensureCollectorExists(id: string) {

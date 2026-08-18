@@ -230,3 +230,57 @@ describe('AdminService – vehicle assignment', () => {
     expect(result).toEqual({ id: 'r1' });
   });
 });
+
+describe('AdminService – collections admin view', () => {
+  let service: AdminService;
+  let prisma: {
+    collection: { findMany: jest.Mock; findUnique: jest.Mock };
+  };
+
+  beforeEach(() => {
+    prisma = {
+      collection: { findMany: jest.fn(), findUnique: jest.fn() },
+    };
+    service = new AdminService(prisma as never);
+  });
+
+  it('lists collections with the weight converted to a number', async () => {
+    prisma.collection.findMany.mockResolvedValue([
+      {
+        id: 'col1',
+        collectionRequestId: 'cr1',
+        weightKg: { toString: () => '15.00' },
+        collectedAt: new Date('2026-08-10T05:00:00.000Z'),
+      },
+    ]);
+
+    const result = await service.findAllCollections();
+
+    expect(prisma.collection.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: { collectedAt: 'desc' } }),
+    );
+    expect(result[0].weightKg).toBe(15);
+  });
+
+  it('returns 404 for a missing collection', async () => {
+    prisma.collection.findUnique.mockResolvedValue(null);
+
+    await expect(service.findCollection('missing')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('returns a single collection with weight as a number', async () => {
+    prisma.collection.findUnique.mockResolvedValue({
+      id: 'col1',
+      collectionRequestId: 'cr1',
+      weightKg: { toString: () => '22.50' },
+      collectedAt: new Date('2026-08-10T05:00:00.000Z'),
+    });
+
+    const result = await service.findCollection('col1');
+
+    expect(result.id).toBe('col1');
+    expect(result.weightKg).toBe(22.5);
+  });
+});
