@@ -48,8 +48,17 @@ const riderSelect = {
   nic: true,
   mobile: true,
   address: true,
+  vehicleId: true,
   createdAt: true,
   updatedAt: true,
+  vehicle: {
+    select: {
+      id: true,
+      vehicleCode: true,
+      vehicleType: true,
+      status: true,
+    },
+  },
   user: {
     select: {
       id: true,
@@ -275,6 +284,10 @@ export class AdminService {
   }
 
   async createRider(dto: CreateRiderDto) {
+    if (dto.vehicleId !== undefined && dto.vehicleId !== null) {
+      await this.validateAssignableVehicle(dto.vehicleId);
+    }
+
     try {
       const passwordHash = await argon2.hash(dto.password);
 
@@ -291,6 +304,7 @@ export class AdminService {
                 nic: dto.nic,
                 mobile: dto.mobile,
                 address: dto.address,
+                vehicleId: dto.vehicleId ?? null,
               },
             },
           },
@@ -332,27 +346,41 @@ export class AdminService {
 
   async updateRider(id: string, dto: UpdateRiderDto) {
     await this.ensureRiderExists(id);
-    const { loginId, password, ...riderData } = dto;
+    const { loginId, password, vehicleId, ...riderData } = dto;
+
+    if (vehicleId !== undefined && vehicleId !== null) {
+      await this.validateAssignableVehicle(vehicleId, id);
+    }
 
     try {
       const passwordHash = password ? await argon2.hash(password) : undefined;
       const hasUserUpdate = loginId !== undefined || passwordHash !== undefined;
 
+      const data: Prisma.RiderUpdateInput = {
+        ...riderData,
+        ...(vehicleId !== undefined
+          ? {
+              vehicle:
+                vehicleId === null
+                  ? { disconnect: true }
+                  : { connect: { id: vehicleId } },
+            }
+          : {}),
+        ...(hasUserUpdate
+          ? {
+              user: {
+                update: {
+                  ...(loginId !== undefined ? { loginId } : {}),
+                  ...(passwordHash !== undefined ? { passwordHash } : {}),
+                },
+              },
+            }
+          : {}),
+      };
+
       return await this.prisma.rider.update({
         where: { id },
-        data: {
-          ...riderData,
-          ...(hasUserUpdate
-            ? {
-                user: {
-                  update: {
-                    ...(loginId !== undefined ? { loginId } : {}),
-                    ...(passwordHash !== undefined ? { passwordHash } : {}),
-                  },
-                },
-              }
-            : {}),
-        },
+        data,
         select: riderSelect,
       });
     } catch (error) {
@@ -562,6 +590,36 @@ export class AdminService {
 
     if (!vehicle) {
       throw new NotFoundException('Vehicle not found');
+    }
+  }
+
+  private async validateAssignableVehicle(vehicleId: string, riderId?: string) {
+    const vehicle = await this.prisma.vehicle.findUnique({
+      where: { id: vehicleId },
+      select: { id: true, status: true },
+    });
+
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
+    if (vehicle.status !== 'ACTIVE') {
+      throw new ConflictException('Only ACTIVE vehicles can be assigned');
+    }
+
+    const assignedRider = riderId
+      ? await this.prisma.rider.findFirst({
+          where: { vehicleId, id: { not: riderId } },
+          select: { id: true },
+        })
+      : await this.prisma.rider.findFirst({
+          where: { vehicleId },
+          select: { id: true },
+        });
+
+    if (assignedRider) {
+      throw new ConflictException(
+        'Vehicle is already assigned to another rider',
+      );
     }
   }
 

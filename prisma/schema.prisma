@@ -77,8 +77,10 @@ model Rider {
   nic      String @unique
   mobile   String
   address  String
+  vehicleId String? @unique @map("vehicle_id") @db.Uuid
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle Vehicle? @relation(fields: [vehicleId], references: [id])
 
   collectionRequests CollectionRequest[]
   collections        Collection[]
@@ -95,6 +97,7 @@ model Vehicle {
   vehicleType String        @map("vehicle_type")
   status      VehicleStatus @default(ACTIVE)
 
+  rider       Rider?
   collections Collection[]
 
   createdAt DateTime @default(now()) @map("created_at")

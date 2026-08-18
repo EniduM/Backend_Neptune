@@ -2,6 +2,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -42,4 +43,8 @@ export class UpdateRiderDto {
   @IsNotEmpty()
   @MaxLength(500)
   address?: string;
+
+  @IsOptional()
+  @IsUUID()
+  vehicleId?: string;
 }

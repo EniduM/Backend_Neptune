@@ -1,3 +1,4 @@
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { AdminService } from './admin.service';
 
 type MockPrisma = {
@@ -144,5 +145,88 @@ describe('AdminService – getLeaderboard', () => {
     expect(result[0].rank).toBe(1);
     expect(result[1].collectorId).toBe('c-b');
     expect(result[1].rank).toBe(2);
+  });
+});
+
+describe('AdminService – vehicle assignment', () => {
+  let service: AdminService;
+  let prisma: {
+    vehicle: { findUnique: jest.Mock };
+    rider: { findFirst: jest.Mock; findUnique: jest.Mock };
+    user: { create: jest.Mock };
+    $transaction: jest.Mock;
+  };
+
+  beforeEach(() => {
+    prisma = {
+      vehicle: { findUnique: jest.fn() },
+      rider: { findFirst: jest.fn(), findUnique: jest.fn() },
+      user: { create: jest.fn() },
+      $transaction: jest.fn(),
+    };
+    service = new AdminService(prisma as never);
+  });
+
+  it('rejects assigning a nonexistent vehicle with 404', async () => {
+    prisma.vehicle.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.updateRider('r1', { vehicleId: 'missing' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rejects assigning an inactive vehicle with 409', async () => {
+    prisma.rider.findUnique.mockResolvedValue({ id: 'r1', userId: 'u1' });
+    prisma.vehicle.findUnique.mockResolvedValue({
+      id: 'v1',
+      status: 'INACTIVE',
+    });
+
+    await expect(
+      service.updateRider('r1', { vehicleId: 'v1' }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('rejects assigning a vehicle already owned by another rider with 409', async () => {
+    prisma.rider.findUnique.mockResolvedValue({ id: 'r1', userId: 'u1' });
+    prisma.vehicle.findUnique.mockResolvedValue({ id: 'v1', status: 'ACTIVE' });
+    prisma.rider.findFirst.mockResolvedValue({ id: 'r2' });
+
+    await expect(
+      service.updateRider('r1', { vehicleId: 'v1' }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('allows a rider to keep their own already-assigned vehicle', async () => {
+    prisma.vehicle.findUnique.mockResolvedValue({ id: 'v1', status: 'ACTIVE' });
+    prisma.rider.findFirst.mockResolvedValue(null);
+    prisma.rider.findUnique.mockResolvedValue({ id: 'r1', userId: 'u1' });
+    prisma.rider.update = jest.fn().mockResolvedValue({ id: 'r1' });
+
+    const result = await service.updateRider('r1', { vehicleId: 'v1' });
+
+    expect(prisma.rider.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          vehicle: { connect: { id: 'v1' } },
+        }),
+      }),
+    );
+    expect(result).toEqual({ id: 'r1' });
+  });
+
+  it('removes the assigned vehicle when vehicleId is null', async () => {
+    prisma.rider.findUnique.mockResolvedValue({ id: 'r1', userId: 'u1' });
+    prisma.rider.update = jest.fn().mockResolvedValue({ id: 'r1' });
+
+    const result = await service.updateRider('r1', { vehicleId: null });
+
+    expect(prisma.vehicle.findUnique).not.toHaveBeenCalled();
+    expect(prisma.rider.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ vehicle: { disconnect: true } }),
+      }),
+    );
+    expect(result).toEqual({ id: 'r1' });
   });
 });

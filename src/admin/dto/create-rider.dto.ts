@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class CreateRiderDto {
   @IsString()
@@ -30,4 +37,8 @@ export class CreateRiderDto {
   @IsNotEmpty()
   @MaxLength(500)
   address: string;
+
+  @IsOptional()
+  @IsUUID()
+  vehicleId?: string;
 }
