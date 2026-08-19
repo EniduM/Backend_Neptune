@@ -889,6 +889,12 @@ export class AdminService {
     return Number(value.toString());
   }
 
+  async getDashboardStatistics() {
+    const totalCollections = await this.prisma.collection.count();
+
+    return { totalCollections };
+  }
+
   async getLeaderboard(period?: string, date?: string) {
     const normalizedPeriod = this.normalizePeriod(period);
     const now = new Date();
