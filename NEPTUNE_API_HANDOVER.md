@@ -1046,6 +1046,28 @@ Create a new Collection Request.
 - `latitude`: Required, number, range -90 to 90
 - `longitude`: Required, number, range -180 to 180
 
+**Business Rule — One Active Request per Collector**:
+
+A Collector may only have ONE active (non-terminal) Collection Request at a
+time. *Active* means status `PENDING` or `ACCEPTED`. If the authenticated
+Collector already has an active request, creation is rejected with **409
+Conflict** and the existing request's `id` and `status` are returned so the
+client can redirect the user straight to it:
+
+```json
+{
+  "statusCode": 409,
+  "message": "You already have an active collection request",
+  "existingRequest": {
+    "id": "aa0e8400-e29b-41d4-a716-446655440099",
+    "status": "PENDING"
+  }
+}
+```
+
+The Collector must wait until their current request reaches `COMPLETED` or
+`CANCELLED` before creating a new one.
+
 **Successful Response** (201 Created):
 
 ```json
@@ -1073,6 +1095,7 @@ Create a new Collection Request.
 - **400 Bad Request**: Invalid coordinates
 - **401 Unauthorized**: No JWT
 - **403 Forbidden**: Not COLLECTOR role
+- **409 Conflict**: Collector already has an active request (`PENDING` or `ACCEPTED`) — response body includes the existing request's `id` and `status` (see Business Rule above)
 
 ---
 
