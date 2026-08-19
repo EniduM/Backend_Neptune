@@ -11,7 +11,10 @@ export class LeaderboardController {
   constructor(private readonly adminService: AdminService) {}
 
   @Get()
-  getLeaderboard(@Query('period') period?: string) {
-    return this.adminService.getLeaderboard(period);
+  getLeaderboard(
+    @Query('period') period?: string,
+    @Query('date') date?: string,
+  ) {
+    return this.adminService.getLeaderboard(period, date);
   }
 }

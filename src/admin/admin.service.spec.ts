@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { AdminService } from './admin.service';
 
 type MockPrisma = {
@@ -95,6 +95,58 @@ describe('AdminService – getLeaderboard', () => {
         where: { collectedAt: { gte: expectedSince } },
       }),
     );
+  });
+
+  it('filters to exact UTC day when period=date', async () => {
+    prisma.collection.groupBy.mockResolvedValue([]);
+    prisma.collector.findMany.mockResolvedValue([]);
+
+    await service.getLeaderboard('date', '2026-08-19');
+
+    expect(prisma.collection.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          collectedAt: {
+            gte: new Date('2026-08-19T00:00:00.000Z'),
+            lt: new Date('2026-08-20T00:00:00.000Z'),
+          },
+        },
+      }),
+    );
+  });
+
+  it('rejects period=date without a date', async () => {
+    await expect(service.getLeaderboard('date')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(prisma.collection.groupBy).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed dates', async () => {
+    await expect(
+      service.getLeaderboard('date', '19-08-2026'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.getLeaderboard('date', '2026/08/19'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects invalid calendar dates', async () => {
+    await expect(
+      service.getLeaderboard('date', '2026-13-40'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.getLeaderboard('date', '2026-02-30'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('returns an empty leaderboard for a date with no collections', async () => {
+    prisma.collection.groupBy.mockResolvedValue([]);
+
+    const result = await service.getLeaderboard('date', '2026-08-19');
+
+    expect(result).toEqual([]);
+    expect(prisma.collector.findMany).not.toHaveBeenCalled();
   });
 
   it('returns empty array when no collections exist', async () => {
