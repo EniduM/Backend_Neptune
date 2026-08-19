@@ -258,7 +258,6 @@ export class ReportsService {
             query.vehicleId,
           ),
           _count: { riderId: true },
-          _sum: { weightKg: true },
         }),
         this.prisma.collectionRequest.groupBy({
           by: ['riderId'],
@@ -289,9 +288,6 @@ export class ReportsService {
       data: riders.map((rider) => ({
         ...rider,
         totalCollections: collections.get(rider.id)?._count.riderId ?? 0,
-        totalWeightKg: this.toNumber(
-          collections.get(rider.id)?._sum.weightKg ?? 0,
-        ),
         totalRequests: requests.get(rider.id)?._count.riderId ?? 0,
         completedRequests: completed.get(rider.id)?._count.riderId ?? 0,
       })),

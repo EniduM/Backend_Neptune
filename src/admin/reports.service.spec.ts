@@ -396,7 +396,6 @@ describe('ReportsService – riders report', () => {
       {
         riderId: 'r1',
         _count: { riderId: 2 },
-        _sum: { weightKg: decimal('30.00') },
       },
     ]);
     prisma.collectionRequest.groupBy
@@ -410,10 +409,13 @@ describe('ReportsService – riders report', () => {
     expect(result.data[0]).toEqual(
       expect.objectContaining({
         totalCollections: 2,
-        totalWeightKg: 30,
         totalRequests: 3,
         completedRequests: 1,
       }),
+    );
+    expect(result.data[0]).not.toHaveProperty('totalWeightKg');
+    expect(prisma.collection.groupBy).toHaveBeenCalledWith(
+      expect.not.objectContaining({ _sum: { weightKg: true } }),
     );
   });
 
