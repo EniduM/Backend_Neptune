@@ -148,6 +148,25 @@ export class CollectorService {
       throw new NotFoundException('Collector not found');
     }
 
+    const activeRequest = await this.prisma.collectionRequest.findFirst({
+      where: {
+        collectorId: collector.id,
+        status: { in: ['PENDING', 'ACCEPTED'] },
+      },
+      select: { id: true, status: true },
+    });
+
+    if (activeRequest) {
+      throw new ConflictException({
+        statusCode: 409,
+        message: 'You already have an active collection request',
+        existingRequest: {
+          id: activeRequest.id,
+          status: activeRequest.status,
+        },
+      });
+    }
+
     const request = await this.prisma.collectionRequest.create({
       data: {
         collectorId: collector.id,

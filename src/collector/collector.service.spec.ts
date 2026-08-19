@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { CollectorService } from './collector.service';
 
 type MockPrisma = {
@@ -7,7 +7,9 @@ type MockPrisma = {
     findMany: jest.Mock;
   };
   collectionRequest: {
+    findFirst: jest.Mock;
     findMany: jest.Mock;
+    create: jest.Mock;
   };
   collection: {
     groupBy: jest.Mock;
@@ -25,7 +27,9 @@ describe('CollectorService', () => {
         findMany: jest.fn(),
       },
       collectionRequest: {
+        findFirst: jest.fn(),
         findMany: jest.fn(),
+        create: jest.fn(),
       },
       collection: {
         groupBy: jest.fn(),
@@ -36,6 +40,66 @@ describe('CollectorService', () => {
       notifyAllRiders: jest.fn().mockResolvedValue(undefined),
       notifyRider: jest.fn().mockResolvedValue(undefined),
     } as never);
+  });
+
+  describe('createCollectionRequest', () => {
+    it('rejects a second request while one is still active', async () => {
+      prisma.collector.findUnique.mockResolvedValue({ id: 'collector-1' });
+      prisma.collectionRequest.findFirst.mockResolvedValue({
+        id: 'request-active',
+        status: 'PENDING',
+      });
+
+      const error = await service
+        .createCollectionRequest('user-1', {
+          latitude: 6.9271,
+          longitude: 79.8612,
+        } as never)
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect(error.response).toEqual({
+        statusCode: 409,
+        message: 'You already have an active collection request',
+        existingRequest: { id: 'request-active', status: 'PENDING' },
+      });
+      expect(prisma.collectionRequest.create).not.toHaveBeenCalled();
+    });
+
+    it('allows a new request when the previous one is COMPLETED', async () => {
+      prisma.collector.findUnique.mockResolvedValue({ id: 'collector-1' });
+      prisma.collectionRequest.findFirst.mockResolvedValue(null);
+      prisma.collectionRequest.create.mockResolvedValue({
+        id: 'request-new',
+        collectorId: 'collector-1',
+        latitude: { toString: () => '6.9271' },
+        longitude: { toString: () => '79.8612' },
+        status: 'PENDING',
+        qrVerified: false,
+        requestedAt: new Date('2026-08-19T00:00:00Z'),
+        acceptedAt: null,
+        completedAt: null,
+        cancelledAt: null,
+        createdAt: new Date('2026-08-19T00:00:00Z'),
+        updatedAt: new Date('2026-08-19T00:00:00Z'),
+        rider: null,
+      });
+
+      const result = await service.createCollectionRequest('user-1', {
+        latitude: 6.9271,
+        longitude: 79.8612,
+      } as never);
+
+      expect(prisma.collectionRequest.findFirst).toHaveBeenCalledWith({
+        where: {
+          collectorId: 'collector-1',
+          status: { in: ['PENDING', 'ACCEPTED'] },
+        },
+        select: { id: true, status: true },
+      });
+      expect(prisma.collectionRequest.create).toHaveBeenCalledTimes(1);
+      expect(result.id).toBe('request-new');
+    });
   });
 
   describe('getMe', () => {
