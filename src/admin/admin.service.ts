@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -851,9 +852,13 @@ export class AdminService {
     return Number(value.toString());
   }
 
-  async getLeaderboard(period?: string) {
+  async getLeaderboard(period?: string, date?: string) {
     const normalizedPeriod = this.normalizePeriod(period);
     const now = new Date();
+    const dateRange =
+      normalizedPeriod === 'date'
+        ? this.parseBusinessDate(date)
+        : undefined;
     const since =
       normalizedPeriod === 'month'
         ? new Date(now.getFullYear(), now.getMonth(), 1)
@@ -861,13 +866,20 @@ export class AdminService {
 
     const grouped = await this.prisma.collection.groupBy({
       by: ['collectorId'],
-      where: since
+      where: dateRange
         ? {
             collectedAt: {
-              gte: since,
+              gte: dateRange.start,
+              lt: dateRange.end,
             },
           }
-        : undefined,
+        : since
+          ? {
+              collectedAt: {
+                gte: since,
+              },
+            }
+          : undefined,
       _sum: {
         weightKg: true,
       },
@@ -909,9 +921,46 @@ export class AdminService {
     return leaderboard;
   }
 
-  private normalizePeriod(period?: string): 'month' | 'all' {
+  private normalizePeriod(period?: string): 'month' | 'date' | 'all' {
     const normalized = String(period ?? 'all').toLowerCase();
-    return normalized === 'month' ? 'month' : 'all';
+    if (normalized === 'month') {
+      return 'month';
+    }
+    if (normalized === 'date') {
+      return 'date';
+    }
+    return 'all';
+  }
+
+  private parseBusinessDate(
+    date?: string,
+  ): { start: Date; end: Date } | undefined {
+    if (!date) {
+      throw new BadRequestException('date is required when period=date');
+    }
+
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+    if (!match) {
+      throw new BadRequestException('date must be in YYYY-MM-DD format');
+    }
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+
+    const start = new Date(Date.UTC(year, month - 1, day));
+    if (
+      start.getUTCFullYear() !== year ||
+      start.getUTCMonth() !== month - 1 ||
+      start.getUTCDate() !== day
+    ) {
+      throw new BadRequestException('date is not a valid calendar date');
+    }
+
+    return {
+      start,
+      end: new Date(Date.UTC(year, month - 1, day + 1)),
+    };
   }
 
   private handleDatabaseError(

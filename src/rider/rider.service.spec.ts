@@ -60,7 +60,10 @@ describe('RiderService', () => {
 
   beforeEach(() => {
     prisma = createPrisma();
-    service = new RiderService(prisma as never);
+    service = new RiderService(
+      prisma as never,
+      { notifyCollector: jest.fn().mockResolvedValue(undefined) } as never,
+    );
   });
 
   describe('completeRequest', () => {

@@ -32,7 +32,10 @@ describe('CollectorService', () => {
       },
     };
 
-    service = new CollectorService(prisma as never);
+    service = new CollectorService(prisma as never, {
+      notifyAllRiders: jest.fn().mockResolvedValue(undefined),
+      notifyRider: jest.fn().mockResolvedValue(undefined),
+    } as never);
   });
 
   describe('getMe', () => {

@@ -7,6 +7,7 @@ import {
 import { timingSafeEqual } from 'crypto';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PushService } from '../push/push.service';
 import { CompleteCollectionRequestDto } from './dto/complete-collection-request.dto';
 
 const requestSelect = {
@@ -54,7 +55,10 @@ const collectionSelect = {
 
 @Injectable()
 export class RiderService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pushService: PushService,
+  ) {}
 
   async findPendingRequests(userId: string) {
     await this.resolveRider(userId);
@@ -99,6 +103,16 @@ export class RiderService {
       throw new NotFoundException('Collection request not found');
     }
 
+    void this.pushService
+      .notifyCollector(acceptedRequest.collectorId, {
+        title: 'Request accepted',
+        body: 'A rider has accepted your collection request — track it in Requests.',
+        tag: 'request-accepted',
+      })
+      .catch((error) => {
+        console.warn('Push notification failed [request-accepted]:', error);
+      });
+
     return acceptedRequest;
   }
 
@@ -134,7 +148,7 @@ export class RiderService {
     const rider = await this.resolveRider(userId);
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const completed = await this.prisma.$transaction(async (tx) => {
         const request = await tx.collectionRequest.findUnique({
           where: { id: requestId },
           select: {
@@ -198,6 +212,10 @@ export class RiderService {
 
         return { request: completedRequest, collection };
       });
+
+      void this.notifyRequestCompleted(completed.request.collectorId);
+
+      return completed;
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -209,6 +227,18 @@ export class RiderService {
       }
 
       throw error;
+    }
+  }
+
+  private async notifyRequestCompleted(collectorId: string) {
+    try {
+      await this.pushService.notifyCollector(collectorId, {
+        title: 'Collection completed',
+        body: 'A collection request you posted has been completed — view it in Requests.',
+        tag: 'request-completed',
+      });
+    } catch (error) {
+      console.warn('Push notification failed [request-completed]:', error);
     }
   }
 

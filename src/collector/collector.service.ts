@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PushService } from '../push/push.service';
 import { CreateCollectionRequestDto } from './dto/create-collection-request.dto';
 
 const assignmentSelect = {
@@ -87,7 +88,10 @@ const collectionRequestHistorySelect = {
 
 @Injectable()
 export class CollectorService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pushService: PushService,
+  ) {}
 
   async getMe(userId: string) {
     const collector = await this.prisma.collector.findUnique({
@@ -154,6 +158,16 @@ export class CollectorService {
       select: collectionRequestSelect,
     });
 
+    void this.pushService
+      .notifyAllRiders({
+        title: 'New collection request',
+        body: 'A collector nearby just posted a job — check Available jobs.',
+        tag: 'new-request',
+      })
+      .catch((error) => {
+        console.warn('Push notification failed [new-request]:', error);
+      });
+
     return this.serializeCollectionRequest(request);
   }
 
@@ -213,6 +227,18 @@ export class CollectorService {
 
     if (!updatedRequest) {
       throw new NotFoundException('Collection request not found');
+    }
+
+    if (updatedRequest.riderId) {
+      void this.pushService
+        .notifyRider(updatedRequest.riderId, {
+          title: 'Request cancelled',
+          body: 'The collector has cancelled this collection request.',
+          tag: 'request-cancelled',
+        })
+        .catch((error) => {
+          console.warn('Push notification failed [request-cancelled]:', error);
+        });
     }
 
     return this.serializeCollectionRequest(updatedRequest);
