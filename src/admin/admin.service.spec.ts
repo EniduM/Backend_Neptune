@@ -1,6 +1,32 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { AdminService } from './admin.service';
 
+describe('AdminService – dashboard statistics', () => {
+  let service: AdminService;
+  let prisma: { collection: { count: jest.Mock } };
+
+  beforeEach(() => {
+    prisma = { collection: { count: jest.fn() } };
+    service = new AdminService(prisma as never);
+  });
+
+  it('returns the real collection count from the database', async () => {
+    prisma.collection.count.mockResolvedValue(25);
+
+    const result = await service.getDashboardStatistics();
+
+    expect(prisma.collection.count).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ totalCollections: 25 });
+  });
+
+  it('reflects changes in the database', async () => {
+    prisma.collection.count.mockResolvedValueOnce(25).mockResolvedValueOnce(26);
+
+    expect((await service.getDashboardStatistics()).totalCollections).toBe(25);
+    expect((await service.getDashboardStatistics()).totalCollections).toBe(26);
+  });
+});
+
 type MockPrisma = {
   collector: {
     findMany: jest.Mock;

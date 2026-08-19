@@ -7,6 +7,7 @@ import { VehiclesController } from './vehicles.controller';
 import { AssignmentsController } from './assignments.controller';
 import { CollectionRequestsController } from './collection-requests.controller';
 import { LeaderboardController } from './leaderboard.controller';
+import { DashboardController } from './dashboard.controller';
 import { ReportsController } from './reports.controller';
 import { ReportsService } from './reports.service';
 
@@ -19,6 +20,7 @@ import { ReportsService } from './reports.service';
     AssignmentsController,
     CollectionRequestsController,
     LeaderboardController,
+    DashboardController,
     ReportsController,
   ],
   providers: [AdminService, ReportsService],
