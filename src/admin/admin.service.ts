@@ -698,6 +698,43 @@ export class AdminService {
     return this.serializeCollectionRequest(request);
   }
 
+  async deleteCollectionRequest(id: string) {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const request = await tx.collectionRequest.findUnique({
+          where: { id },
+          select: { id: true, collection: { select: { id: true } } },
+        });
+
+        if (!request) {
+          throw new NotFoundException('Collection request not found');
+        }
+
+        if (request.collection) {
+          throw new ConflictException(
+            'Collection request cannot be deleted because it has related collection data',
+          );
+        }
+
+        return tx.collectionRequest.delete({
+          where: { id },
+          select: collectionRequestSelect,
+        });
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
+        throw new ConflictException(
+          'Collection request cannot be deleted because it has related collection data',
+        );
+      }
+
+      throw error;
+    }
+  }
+
   async findAllCollections() {
     const collections = await this.prisma.collection.findMany({
       select: collectionSelect,

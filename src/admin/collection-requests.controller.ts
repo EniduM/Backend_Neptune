@@ -1,4 +1,10 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -18,5 +24,10 @@ export class CollectionRequestsController {
   @Get(':id')
   findCollectionRequest(@Param('id') id: string) {
     return this.adminService.findCollectionRequest(id);
+  }
+
+  @Delete(':id')
+  deleteCollectionRequest(@Param('id') id: string) {
+    return this.adminService.deleteCollectionRequest(id);
   }
 }
