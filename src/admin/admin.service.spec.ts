@@ -289,7 +289,12 @@ describe('AdminService – delete operations (cascade)', () => {
     collector: { findUnique: jest.Mock };
     rider: { findUnique: jest.Mock; delete: jest.Mock };
     vehicle: { findUnique: jest.Mock; delete: jest.Mock };
-    collectionRequest: { findMany: jest.Mock; deleteMany: jest.Mock };
+    collectionRequest: {
+      findMany: jest.Mock;
+      deleteMany: jest.Mock;
+      findUnique: jest.Mock;
+      delete: jest.Mock;
+    };
     collection: { deleteMany: jest.Mock };
     dailyAssignment: { deleteMany: jest.Mock };
     user: { delete: jest.Mock };
@@ -301,7 +306,12 @@ describe('AdminService – delete operations (cascade)', () => {
       collector: { findUnique: jest.fn() },
       rider: { findUnique: jest.fn(), delete: jest.fn() },
       vehicle: { findUnique: jest.fn(), delete: jest.fn() },
-      collectionRequest: { findMany: jest.fn(), deleteMany: jest.fn() },
+      collectionRequest: {
+        findMany: jest.fn(),
+        deleteMany: jest.fn(),
+        findUnique: jest.fn(),
+        delete: jest.fn(),
+      },
       collection: { deleteMany: jest.fn() },
       dailyAssignment: { deleteMany: jest.fn() },
       user: { delete: jest.fn() },
@@ -436,6 +446,45 @@ describe('AdminService – delete operations (cascade)', () => {
       );
       expect(prisma.rider.delete).not.toHaveBeenCalled();
       expect(result).toEqual({ id: 'v1' });
+    });
+  });
+
+  describe('deleteCollectionRequest', () => {
+    it('returns 404 when the collection request does not exist', async () => {
+      prisma.collectionRequest.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.deleteCollectionRequest('missing'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.collectionRequest.delete).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 when the request has related collection data and preserves it', async () => {
+      prisma.collectionRequest.findUnique.mockResolvedValue({
+        id: 'cr1',
+        collection: { id: 'col1' },
+      });
+
+      await expect(
+        service.deleteCollectionRequest('cr1'),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.collectionRequest.delete).not.toHaveBeenCalled();
+    });
+
+    it('deletes a request with no related collection data', async () => {
+      prisma.collectionRequest.findUnique.mockResolvedValue({
+        id: 'cr1',
+        collection: null,
+      });
+      prisma.collectionRequest.delete.mockResolvedValue({ id: 'cr1' });
+
+      const result = await service.deleteCollectionRequest('cr1');
+
+      expect(prisma.collectionRequest.delete).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'cr1' } }),
+      );
+      expect(prisma.collection.deleteMany).not.toHaveBeenCalled();
+      expect(result).toEqual({ id: 'cr1' });
     });
   });
 });
