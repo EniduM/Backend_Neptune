@@ -711,9 +711,10 @@ export class AdminService {
         }
 
         if (request.collection) {
-          throw new ConflictException(
-            'Collection request cannot be deleted because it has related collection data',
-          );
+          await tx.collection.update({
+            where: { id: request.collection.id },
+            data: { collectionRequestId: null },
+          });
         }
 
         return tx.collectionRequest.delete({

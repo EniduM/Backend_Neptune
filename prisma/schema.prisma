@@ -170,14 +170,14 @@ model CollectionRequest {
 
 model Collection {
   id                  String   @id @default(uuid()) @db.Uuid
-  collectionRequestId String   @unique @map("collection_request_id") @db.Uuid
+  collectionRequestId String?  @unique @map("collection_request_id") @db.Uuid
   collectorId         String   @map("collector_id") @db.Uuid
   riderId             String   @map("rider_id") @db.Uuid
   vehicleId           String   @map("vehicle_id") @db.Uuid
   weightKg            Decimal  @map("weight_kg") @db.Decimal(10, 2)
   collectedAt         DateTime @map("collected_at")
 
-  collectionRequest CollectionRequest @relation(fields: [collectionRequestId], references: [id], onDelete: Restrict)
+  collectionRequest CollectionRequest? @relation(fields: [collectionRequestId], references: [id], onDelete: Restrict)
   collector         Collector         @relation(fields: [collectorId], references: [id], onDelete: Restrict)
   rider             Rider             @relation(fields: [riderId], references: [id], onDelete: Restrict)
   vehicle           Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Restrict)

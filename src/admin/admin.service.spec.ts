@@ -321,7 +321,7 @@ describe('AdminService – delete operations (cascade)', () => {
       findUnique: jest.Mock;
       delete: jest.Mock;
     };
-    collection: { deleteMany: jest.Mock };
+    collection: { deleteMany: jest.Mock; update: jest.Mock };
     dailyAssignment: { deleteMany: jest.Mock };
     user: { delete: jest.Mock };
     $transaction: jest.Mock;
@@ -338,7 +338,7 @@ describe('AdminService – delete operations (cascade)', () => {
         findUnique: jest.fn(),
         delete: jest.fn(),
       },
-      collection: { deleteMany: jest.fn() },
+      collection: { deleteMany: jest.fn(), update: jest.fn() },
       dailyAssignment: { deleteMany: jest.fn() },
       user: { delete: jest.fn() },
       $transaction: jest.fn(),
@@ -485,16 +485,28 @@ describe('AdminService – delete operations (cascade)', () => {
       expect(prisma.collectionRequest.delete).not.toHaveBeenCalled();
     });
 
-    it('returns 409 when the request has related collection data and preserves it', async () => {
+    it('detaches the related collection and deletes the request, preserving the collection', async () => {
       prisma.collectionRequest.findUnique.mockResolvedValue({
         id: 'cr1',
         collection: { id: 'col1' },
       });
+      prisma.collection.update.mockResolvedValue({
+        id: 'col1',
+        collectionRequestId: null,
+      });
+      prisma.collectionRequest.delete.mockResolvedValue({ id: 'cr1' });
 
-      await expect(
-        service.deleteCollectionRequest('cr1'),
-      ).rejects.toBeInstanceOf(ConflictException);
-      expect(prisma.collectionRequest.delete).not.toHaveBeenCalled();
+      const result = await service.deleteCollectionRequest('cr1');
+
+      expect(prisma.collection.update).toHaveBeenCalledWith({
+        where: { id: 'col1' },
+        data: { collectionRequestId: null },
+      });
+      expect(prisma.collectionRequest.delete).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'cr1' } }),
+      );
+      expect(prisma.collection.deleteMany).not.toHaveBeenCalled();
+      expect(result).toEqual({ id: 'cr1' });
     });
 
     it('deletes a request with no related collection data', async () => {
