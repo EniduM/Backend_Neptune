@@ -524,6 +524,19 @@ describe('AdminService – delete operations (cascade)', () => {
       expect(prisma.collection.deleteMany).not.toHaveBeenCalled();
       expect(result).toEqual({ id: 'cr1' });
     });
+
+    it('rolls back safely when detaching the collection fails', async () => {
+      prisma.collectionRequest.findUnique.mockResolvedValue({
+        id: 'cr1',
+        collection: { id: 'col1' },
+      });
+      prisma.collection.update.mockRejectedValue(new Error('db down'));
+
+      await expect(
+        service.deleteCollectionRequest('cr1'),
+      ).rejects.toThrow('db down');
+      expect(prisma.collectionRequest.delete).not.toHaveBeenCalled();
+    });
   });
 });
 
