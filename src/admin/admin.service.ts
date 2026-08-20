@@ -452,7 +452,7 @@ export class AdminService {
     const { loginId, password, vehicleId, nic, ...riderData } = dto;
 
     if (vehicleId !== undefined && vehicleId !== null) {
-      await this.validateAssignableVehicle(vehicleId, id);
+      await this.validateAssignableVehicle(vehicleId);
     }
 
     try {
@@ -807,7 +807,7 @@ export class AdminService {
     }
   }
 
-  private async validateAssignableVehicle(vehicleId: string, riderId?: string) {
+  private async validateAssignableVehicle(vehicleId: string) {
     const vehicle = await this.prisma.vehicle.findUnique({
       where: { id: vehicleId },
       select: { id: true, status: true },
@@ -818,22 +818,6 @@ export class AdminService {
     }
     if (vehicle.status !== 'ACTIVE') {
       throw new ConflictException('Only ACTIVE vehicles can be assigned');
-    }
-
-    const assignedRider = riderId
-      ? await this.prisma.rider.findFirst({
-          where: { vehicleId, id: { not: riderId } },
-          select: { id: true },
-        })
-      : await this.prisma.rider.findFirst({
-          where: { vehicleId },
-          select: { id: true },
-        });
-
-    if (assignedRider) {
-      throw new ConflictException(
-        'Vehicle is already assigned to another rider',
-      );
     }
   }
 

@@ -276,6 +276,10 @@ describe('AdminService – vehicle assignment', () => {
       user: { create: jest.fn() },
       $transaction: jest.fn(),
     };
+    prisma.$transaction.mockImplementation(
+      async (callback: (tx: typeof prisma) => Promise<unknown>) =>
+        callback(prisma),
+    );
     service = new AdminService(prisma as never);
   });
 
@@ -299,14 +303,43 @@ describe('AdminService – vehicle assignment', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('rejects assigning a vehicle already owned by another rider with 409', async () => {
+  it('allows a vehicle already assigned to another rider to be shared', async () => {
     prisma.rider.findUnique.mockResolvedValue({ id: 'r1', userId: 'u1' });
     prisma.vehicle.findUnique.mockResolvedValue({ id: 'v1', status: 'ACTIVE' });
-    prisma.rider.findFirst.mockResolvedValue({ id: 'r2' });
+    prisma.rider.update = jest.fn().mockResolvedValue({ id: 'r1' });
 
-    await expect(
-      service.updateRider('r1', { vehicleId: 'v1' }),
-    ).rejects.toBeInstanceOf(ConflictException);
+    const result = await service.updateRider('r1', { vehicleId: 'v1' });
+
+    expect(prisma.rider.findFirst).not.toHaveBeenCalled();
+    expect(prisma.rider.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          vehicle: { connect: { id: 'v1' } },
+        }),
+      }),
+    );
+    expect(result).toEqual({ id: 'r1' });
+  });
+
+  it('creates a rider with a vehicle shared with another rider', async () => {
+    prisma.vehicle.findUnique.mockResolvedValue({ id: 'v1', status: 'ACTIVE' });
+    prisma.user.create.mockResolvedValue({ id: 'r2' });
+
+    const dto: CreateRiderDto = {
+      loginId: 'r2',
+      password: 'password',
+      fullName: 'Rider Two',
+      nic: '200012345678',
+      mobile: '0777777222',
+      address: 'Addr',
+      vehicleId: 'v1',
+    };
+
+    const result = await service.createRider(dto);
+
+    expect(prisma.rider.findFirst).not.toHaveBeenCalled();
+    expect(prisma.user.create).toHaveBeenCalled();
+    expect(result).toEqual({ id: 'r2' });
   });
 
   it('allows a rider to keep their own already-assigned vehicle', async () => {
