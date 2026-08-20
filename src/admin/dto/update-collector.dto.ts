@@ -5,6 +5,8 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { normalizeNic } from '../../common/validators/nic.util';
 
 export class UpdateCollectorDto {
   @IsOptional()
@@ -29,6 +31,7 @@ export class UpdateCollectorDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
+  @Transform(({ value }) => normalizeNic(value))
   nic?: string;
 
   @IsOptional()
