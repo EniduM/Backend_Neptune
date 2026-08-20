@@ -3,24 +3,58 @@ import { AdminService } from './admin.service';
 
 describe('AdminService – dashboard statistics', () => {
   let service: AdminService;
-  let prisma: { collection: { count: jest.Mock } };
+  let prisma: {
+    collection: { count: jest.Mock };
+    collector: { count: jest.Mock };
+    rider: { count: jest.Mock };
+    vehicle: { count: jest.Mock };
+    collectionRequest: { count: jest.Mock };
+  };
 
   beforeEach(() => {
-    prisma = { collection: { count: jest.fn() } };
+    prisma = {
+      collection: { count: jest.fn() },
+      collector: { count: jest.fn() },
+      rider: { count: jest.fn() },
+      vehicle: { count: jest.fn() },
+      collectionRequest: { count: jest.fn() },
+    };
     service = new AdminService(prisma as never);
   });
 
-  it('returns the real collection count from the database', async () => {
-    prisma.collection.count.mockResolvedValue(25);
+  it('returns the live dashboard statistics, including totalCollections', async () => {
+    prisma.collection.count.mockResolvedValue(8);
+    prisma.collector.count.mockResolvedValue(14);
+    prisma.rider.count.mockResolvedValue(2);
+    prisma.vehicle.count.mockResolvedValue(1);
+    prisma.collectionRequest.count.mockResolvedValue(1);
 
     const result = await service.getDashboardStatistics();
 
     expect(prisma.collection.count).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({ totalCollections: 25 });
+    expect(prisma.collector.count).toHaveBeenCalledTimes(1);
+    expect(prisma.rider.count).toHaveBeenCalledTimes(1);
+    expect(prisma.vehicle.count).toHaveBeenCalledWith({
+      where: { status: 'ACTIVE' },
+    });
+    expect(prisma.collectionRequest.count).toHaveBeenCalledWith({
+      where: { status: 'PENDING' },
+    });
+    expect(result).toEqual({
+      totalCollections: 8,
+      totalCollectors: 14,
+      totalRiders: 2,
+      activeVehicles: 1,
+      pendingRequests: 1,
+    });
   });
 
-  it('reflects changes in the database', async () => {
+  it('reflects database changes in the count', async () => {
     prisma.collection.count.mockResolvedValueOnce(25).mockResolvedValueOnce(26);
+    prisma.collector.count.mockResolvedValue(14);
+    prisma.rider.count.mockResolvedValue(2);
+    prisma.vehicle.count.mockResolvedValue(1);
+    prisma.collectionRequest.count.mockResolvedValue(1);
 
     expect((await service.getDashboardStatistics()).totalCollections).toBe(25);
     expect((await service.getDashboardStatistics()).totalCollections).toBe(26);

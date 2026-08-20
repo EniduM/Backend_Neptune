@@ -891,9 +891,22 @@ export class AdminService {
   }
 
   async getDashboardStatistics() {
-    const totalCollections = await this.prisma.collection.count();
+    const [totalCollections, totalCollectors, totalRiders, activeVehicles, pendingRequests] =
+      await Promise.all([
+        this.prisma.collection.count(),
+        this.prisma.collector.count(),
+        this.prisma.rider.count(),
+        this.prisma.vehicle.count({ where: { status: 'ACTIVE' } }),
+        this.prisma.collectionRequest.count({ where: { status: 'PENDING' } }),
+      ]);
 
-    return { totalCollections };
+    return {
+      totalCollections,
+      totalCollectors,
+      totalRiders,
+      activeVehicles,
+      pendingRequests,
+    };
   }
 
   async getLeaderboard(period?: string, date?: string) {
