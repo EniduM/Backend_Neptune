@@ -5,6 +5,8 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { normalizeNic } from '../../common/validators/nic.util';
 
 export class CreateCollectorDto {
   @IsString()
@@ -25,6 +27,7 @@ export class CreateCollectorDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
+  @Transform(({ value }) => normalizeNic(value))
   nic: string;
 
   @IsString()

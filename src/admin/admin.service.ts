@@ -18,6 +18,7 @@ import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { UpdateVehicleStatusDto } from './dto/update-vehicle-status.dto';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
+import { normalizeNic } from '../common/validators/nic.util';
 import { UpdateAssignmentDto } from './dto/update-assignment.dto';
 
 const collectorSelect = {
@@ -250,7 +251,7 @@ export class AdminService {
           collector: {
             create: {
               fullName: dto.fullName,
-              nic: dto.nic,
+              nic: normalizeNic(dto.nic),
               mobile: dto.mobile,
               address: dto.address,
               guardianName: dto.guardianName,
@@ -300,7 +301,7 @@ export class AdminService {
 
   async updateCollector(id: string, dto: UpdateCollectorDto) {
     await this.ensureCollectorExists(id);
-    const { loginId, password, ...collectorData } = dto;
+    const { loginId, password, nic, ...collectorData } = dto;
 
     try {
       const passwordHash = password ? await argon2.hash(password) : undefined;
@@ -310,6 +311,7 @@ export class AdminService {
         where: { id },
         data: {
           ...collectorData,
+          ...(nic !== undefined ? { nic: normalizeNic(nic) } : {}),
           ...(hasUserUpdate
             ? {
                 user: {
@@ -402,7 +404,7 @@ export class AdminService {
             rider: {
               create: {
                 fullName: dto.fullName,
-                nic: dto.nic,
+                nic: normalizeNic(dto.nic),
                 mobile: dto.mobile,
                 address: dto.address,
                 vehicleId: dto.vehicleId ?? null,
@@ -447,7 +449,7 @@ export class AdminService {
 
   async updateRider(id: string, dto: UpdateRiderDto) {
     await this.ensureRiderExists(id);
-    const { loginId, password, vehicleId, ...riderData } = dto;
+    const { loginId, password, vehicleId, nic, ...riderData } = dto;
 
     if (vehicleId !== undefined && vehicleId !== null) {
       await this.validateAssignableVehicle(vehicleId, id);
@@ -459,6 +461,7 @@ export class AdminService {
 
       const data: Prisma.RiderUpdateInput = {
         ...riderData,
+        ...(nic !== undefined ? { nic: normalizeNic(nic) } : {}),
         ...(vehicleId !== undefined
           ? {
               vehicle:

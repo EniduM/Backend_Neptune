@@ -6,6 +6,8 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { normalizeNic } from '../../common/validators/nic.util';
 
 export class CreateRiderDto {
   @IsString()
@@ -26,6 +28,7 @@ export class CreateRiderDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
+  @Transform(({ value }) => normalizeNic(value))
   nic: string;
 
   @IsString()
