@@ -1,2 +1,2 @@
--- DropIndex
-DROP INDEX "riders_vehicle_id_key";
+-- AlterTable
+ALTER TABLE riders DROP CONSTRAINT riders_vehicle_id_key;
