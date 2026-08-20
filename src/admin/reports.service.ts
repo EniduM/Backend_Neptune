@@ -305,7 +305,7 @@ export class ReportsService {
           vehicleType: true,
           status: true,
           createdAt: true,
-          rider: {
+          riders: {
             select: {
               id: true,
               fullName: true,
