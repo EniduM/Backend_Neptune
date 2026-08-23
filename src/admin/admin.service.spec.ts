@@ -138,22 +138,26 @@ describe('AdminService – getLeaderboard', () => {
     expect(prisma.collection.groupBy).toHaveBeenCalledWith(
       expect.objectContaining({ where: undefined }),
     );
-    expect(result).toEqual([
-      {
-        collectorId: 'c1',
-        fullName: 'Alice',
-        totalWeightKg: 120,
-        totalCollections: 3,
-        rank: 1,
-      },
-      {
-        collectorId: 'c2',
-        fullName: 'Bob',
-        totalWeightKg: 45.5,
-        totalCollections: 1,
-        rank: 2,
-      },
-    ]);
+    expect(result).toEqual({
+      period: 'all',
+      date: null,
+      data: [
+        {
+          collectorId: 'c1',
+          fullName: 'Alice',
+          totalWeightKg: 120,
+          totalCollections: 3,
+          rank: 1,
+        },
+        {
+          collectorId: 'c2',
+          fullName: 'Bob',
+          totalWeightKg: 45.5,
+          totalCollections: 1,
+          rank: 2,
+        },
+      ],
+    });
   });
 
   it('returns all-time leaderboard when period=all', async () => {
@@ -169,18 +173,19 @@ describe('AdminService – getLeaderboard', () => {
 
   it('filters to current month when period=month', async () => {
     const now = new Date();
-    const expectedSince = new Date(now.getFullYear(), now.getMonth(), 1);
+    const expectedSince = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 
     prisma.collection.groupBy.mockResolvedValue([]);
     prisma.collector.findMany.mockResolvedValue([]);
 
-    await service.getLeaderboard('month');
+    const result = await service.getLeaderboard('month');
 
     expect(prisma.collection.groupBy).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { collectedAt: { gte: expectedSince } },
       }),
     );
+    expect(result).toEqual({ period: 'month', date: null, data: [] });
   });
 
   it('filters to exact UTC day when period=date', async () => {
@@ -231,7 +236,7 @@ describe('AdminService – getLeaderboard', () => {
 
     const result = await service.getLeaderboard('date', '2026-08-19');
 
-    expect(result).toEqual({ date: '2026-08-19', data: [] });
+    expect(result).toEqual({ period: 'date', date: '2026-08-19', data: [] });
     expect(prisma.collector.findMany).not.toHaveBeenCalled();
   });
 
@@ -252,7 +257,7 @@ describe('AdminService – getLeaderboard', () => {
     );
   });
 
-  it('returns wrapped {date, data} when date is provided', async () => {
+  it('returns wrapped {period, date, data} when date is provided', async () => {
     prisma.collection.groupBy.mockResolvedValue([
       {
         collectorId: 'c1',
@@ -267,6 +272,7 @@ describe('AdminService – getLeaderboard', () => {
     const result = await service.getLeaderboard(undefined, '2026-08-24');
 
     expect(result).toEqual({
+      period: 'date',
       date: '2026-08-24',
       data: [
         {
@@ -285,7 +291,7 @@ describe('AdminService – getLeaderboard', () => {
 
     const result = await service.getLeaderboard(undefined, '2099-12-31');
 
-    expect(result).toEqual({ date: '2099-12-31', data: [] });
+    expect(result).toEqual({ period: 'date', date: '2099-12-31', data: [] });
     expect(prisma.collection.groupBy).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -298,12 +304,12 @@ describe('AdminService – getLeaderboard', () => {
     );
   });
 
-  it('returns empty array when no collections exist', async () => {
+  it('returns empty data when no collections exist', async () => {
     prisma.collection.groupBy.mockResolvedValue([]);
 
     const result = await service.getLeaderboard();
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ period: 'all', date: null, data: [] });
     expect(prisma.collector.findMany).not.toHaveBeenCalled();
   });
 
@@ -319,7 +325,7 @@ describe('AdminService – getLeaderboard', () => {
 
     const result = await service.getLeaderboard();
 
-    expect(result[0].fullName).toBe('Unknown Collector');
+    expect(result.data[0].fullName).toBe('Unknown Collector');
   });
 
   it('breaks ties by totalCollections then collectorId', async () => {
@@ -342,10 +348,10 @@ describe('AdminService – getLeaderboard', () => {
 
     const result = await service.getLeaderboard();
 
-    expect(result[0].collectorId).toBe('c-a');
-    expect(result[0].rank).toBe(1);
-    expect(result[1].collectorId).toBe('c-b');
-    expect(result[1].rank).toBe(2);
+    expect(result.data[0].collectorId).toBe('c-a');
+    expect(result.data[0].rank).toBe(1);
+    expect(result.data[1].collectorId).toBe('c-b');
+    expect(result.data[1].rank).toBe(2);
   });
 });
 
