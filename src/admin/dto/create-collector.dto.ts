@@ -2,6 +2,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -55,4 +56,8 @@ export class CreateCollectorDto {
   @IsNotEmpty()
   @MaxLength(100)
   qrToken?: string;
+
+  @IsOptional()
+  @IsUUID()
+  universityId?: string;
 }

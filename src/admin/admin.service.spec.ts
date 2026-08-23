@@ -1,10 +1,11 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '../../generated/prisma/client';
 import { AdminService } from './admin.service';
 
 describe('AdminService – dashboard statistics', () => {
   let service: AdminService;
   let prisma: {
-    collection: { count: jest.Mock };
+    collection: { count: jest.Mock; aggregate: jest.Mock };
     collector: { count: jest.Mock };
     rider: { count: jest.Mock };
     vehicle: { count: jest.Mock };
@@ -13,7 +14,7 @@ describe('AdminService – dashboard statistics', () => {
 
   beforeEach(() => {
     prisma = {
-      collection: { count: jest.fn() },
+      collection: { count: jest.fn(), aggregate: jest.fn() },
       collector: { count: jest.fn() },
       rider: { count: jest.fn() },
       vehicle: { count: jest.fn() },
@@ -22,12 +23,15 @@ describe('AdminService – dashboard statistics', () => {
     service = new AdminService(prisma as never);
   });
 
-  it('returns the live dashboard statistics, including totalCollections', async () => {
+  it('returns the live dashboard statistics, including totalCollectedWeightKg', async () => {
     prisma.collection.count.mockResolvedValue(8);
     prisma.collector.count.mockResolvedValue(14);
     prisma.rider.count.mockResolvedValue(2);
     prisma.vehicle.count.mockResolvedValue(1);
     prisma.collectionRequest.count.mockResolvedValue(1);
+    prisma.collection.aggregate.mockResolvedValue({
+      _sum: { weightKg: { toString: () => '125.6' } },
+    });
 
     const result = await service.getDashboardStatistics();
 
@@ -40,13 +44,32 @@ describe('AdminService – dashboard statistics', () => {
     expect(prisma.collectionRequest.count).toHaveBeenCalledWith({
       where: { status: 'PENDING' },
     });
+    expect(prisma.collection.aggregate).toHaveBeenCalledWith({
+      _sum: { weightKg: true },
+      where: { collectionRequest: { status: 'COMPLETED' } },
+    });
     expect(result).toEqual({
       totalCollections: 8,
       totalCollectors: 14,
       totalRiders: 2,
       activeVehicles: 1,
       pendingRequests: 1,
+      totalCollectedWeightKg: 125.6,
     });
+  });
+
+  it('returns 0 totalCollectedWeightKg when there are no completed collections', async () => {
+    prisma.collection.count.mockResolvedValue(0);
+    prisma.collector.count.mockResolvedValue(14);
+    prisma.rider.count.mockResolvedValue(2);
+    prisma.vehicle.count.mockResolvedValue(1);
+    prisma.collectionRequest.count.mockResolvedValue(0);
+    prisma.collection.aggregate.mockResolvedValue({
+      _sum: { weightKg: null },
+    });
+
+    const result = await service.getDashboardStatistics();
+    expect(result.totalCollectedWeightKg).toBe(0);
   });
 
   it('reflects database changes in the count', async () => {
@@ -55,6 +78,9 @@ describe('AdminService – dashboard statistics', () => {
     prisma.rider.count.mockResolvedValue(2);
     prisma.vehicle.count.mockResolvedValue(1);
     prisma.collectionRequest.count.mockResolvedValue(1);
+    prisma.collection.aggregate.mockResolvedValue({
+      _sum: { weightKg: { toString: () => '0' } },
+    });
 
     expect((await service.getDashboardStatistics()).totalCollections).toBe(25);
     expect((await service.getDashboardStatistics()).totalCollections).toBe(26);
@@ -658,5 +684,213 @@ describe('AdminService – collections admin view', () => {
 
     expect(result.id).toBe('col1');
     expect(result.weightKg).toBe(22.5);
+  });
+});
+
+describe('AdminService – university CRUD', () => {
+  let service: AdminService;
+  let prisma: {
+    university: {
+      create: jest.Mock;
+      findMany: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+      delete: jest.Mock;
+    };
+    collector: { count: jest.Mock };
+  };
+
+  beforeEach(() => {
+    prisma = {
+      university: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+      collector: { count: jest.fn() },
+    };
+    service = new AdminService(prisma as never);
+  });
+
+  it('creates a university', async () => {
+    prisma.university.create.mockResolvedValue({
+      id: 'u1',
+      name: 'AIBT',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await service.createUniversity({ name: 'AIBT' });
+    expect(result.name).toBe('AIBT');
+    expect(prisma.university.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { name: 'AIBT' } }),
+    );
+  });
+
+  it('trims whitespace from university name', async () => {
+    prisma.university.create.mockResolvedValue({
+      id: 'u1',
+      name: 'Peradeniya',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await service.createUniversity({ name: '  Peradeniya  ' });
+    expect(prisma.university.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { name: 'Peradeniya' } }),
+    );
+  });
+
+  it('throws ConflictException for duplicate university name', async () => {
+    const error = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: '0.0.0',
+      meta: { target: ['name'] },
+    });
+    prisma.university.create.mockRejectedValue(error);
+
+    await expect(
+      service.createUniversity({ name: 'AIBT' }),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('lists all universities sorted by name', async () => {
+    prisma.university.findMany.mockResolvedValue([]);
+    await service.findAllUniversities();
+    expect(prisma.university.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: { name: 'asc' } }),
+    );
+  });
+
+  it('finds a university by id', async () => {
+    prisma.university.findUnique.mockResolvedValue({
+      id: 'u1',
+      name: 'AIBT',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const result = await service.findUniversity('u1');
+    expect(result.id).toBe('u1');
+  });
+
+  it('throws NotFoundException for missing university', async () => {
+    prisma.university.findUnique.mockResolvedValue(null);
+    await expect(service.findUniversity('missing')).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('updates a university', async () => {
+    prisma.university.findUnique.mockResolvedValue({ id: 'u1' });
+    prisma.university.update.mockResolvedValue({
+      id: 'u1',
+      name: 'AIBT Updated',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await service.updateUniversity('u1', {
+      name: 'AIBT Updated',
+    });
+    expect(result.name).toBe('AIBT Updated');
+  });
+
+  it('deletes a university with no linked collectors', async () => {
+    prisma.university.findUnique.mockResolvedValue({ id: 'u1' });
+    prisma.collector.count.mockResolvedValue(0);
+    prisma.university.delete.mockResolvedValue({
+      id: 'u1',
+      name: 'AIBT',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await service.deleteUniversity('u1');
+    expect(result.id).toBe('u1');
+  });
+
+  it('throws ConflictException when deleting university linked to collectors', async () => {
+    prisma.university.findUnique.mockResolvedValue({ id: 'u1' });
+    prisma.collector.count.mockResolvedValue(5);
+
+    await expect(service.deleteUniversity('u1')).rejects.toThrow(
+      ConflictException,
+    );
+  });
+});
+
+describe('AdminService – university distribution', () => {
+  let service: AdminService;
+  let prisma: {
+    collection: { findMany: jest.Mock };
+    university: { findMany: jest.Mock };
+  };
+
+  beforeEach(() => {
+    prisma = {
+      collection: { findMany: jest.fn() },
+      university: { findMany: jest.fn() },
+    };
+    service = new AdminService(prisma as never);
+  });
+
+  it('throws BadRequestException when date is missing', async () => {
+    await expect(
+      service.getUniversityDistribution(undefined as never),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('throws BadRequestException for invalid date format', async () => {
+    await expect(
+      service.getUniversityDistribution('not-a-date'),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('returns empty distribution when no collections exist for the date', async () => {
+    prisma.collection.findMany.mockResolvedValue([]);
+
+    const result = await service.getUniversityDistribution('2026-08-23');
+    expect(result).toEqual({
+      date: '2026-08-23',
+      total: 0,
+      distribution: [],
+    });
+  });
+
+  it('calculates distribution grouped by university', async () => {
+    prisma.collection.findMany.mockResolvedValue([
+      { collector: { universityId: 'u1' } },
+      { collector: { universityId: 'u1' } },
+      { collector: { universityId: 'u2' } },
+      { collector: { universityId: null } },
+    ]);
+    prisma.university.findMany.mockResolvedValue([
+      { id: 'u1', name: 'AIBT' },
+      { id: 'u2', name: 'Peradeniya' },
+    ]);
+
+    const result = await service.getUniversityDistribution('2026-08-23');
+    expect(result.total).toBe(4);
+    expect(result.distribution).toHaveLength(3);
+    expect(result.distribution[0]).toEqual({
+      universityId: 'u1',
+      universityName: 'AIBT',
+      count: 2,
+      percentage: 50,
+    });
+    expect(result.distribution[1]).toEqual({
+      universityId: 'u2',
+      universityName: 'Peradeniya',
+      count: 1,
+      percentage: 25,
+    });
+    expect(result.distribution[2]).toEqual({
+      universityId: null,
+      universityName: 'Unassigned',
+      count: 1,
+      percentage: 25,
+    });
   });
 });

@@ -2,6 +2,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -63,4 +64,8 @@ export class UpdateCollectorDto {
   @IsNotEmpty()
   @MaxLength(100)
   qrToken?: string;
+
+  @IsOptional()
+  @IsUUID()
+  universityId?: string | null;
 }

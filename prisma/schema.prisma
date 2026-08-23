@@ -66,18 +66,31 @@ model PushSubscription {
   @@map("push_subscriptions")
 }
 
+model University {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  collectors Collector[]
+
+  @@map("universities")
+}
+
 model Collector {
-  id             String @id @default(uuid()) @db.Uuid
-  userId         String @unique @map("user_id") @db.Uuid
-  fullName       String @map("full_name")
-  nic            String @unique
+  id             String  @id @default(uuid()) @db.Uuid
+  userId         String  @unique @map("user_id") @db.Uuid
+  fullName       String  @map("full_name")
+  nic            String  @unique
   mobile         String
   address        String
-  guardianName   String @map("guardian_name")
-  guardianMobile String @map("guardian_mobile")
-  qrToken        String @unique @map("qr_token")
+  guardianName   String  @map("guardian_name")
+  guardianMobile String  @map("guardian_mobile")
+  qrToken        String  @unique @map("qr_token")
+  universityId   String? @map("university_id") @db.Uuid
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  university University? @relation(fields: [universityId], references: [id], onDelete: SetNull)
 
   dailyAssignments   DailyAssignment[]
   collectionRequests CollectionRequest[]
