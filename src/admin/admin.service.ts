@@ -1002,12 +1002,10 @@ export class AdminService {
       }));
 
     if (date) {
-      return { period: 'date', date, data };
+      return { date, data };
     }
-    if (isMonth) {
-      return { period: 'month', date: null, data };
-    }
-    return { period: 'all', date: null, data };
+
+    return data;
   }
 
   // ── University CRUD ──────────────────────────────────────────────
