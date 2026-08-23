@@ -878,14 +878,24 @@ export class AdminService {
   }
 
   async getDashboardStatistics() {
-    const [totalCollections, totalCollectors, totalRiders, activeVehicles, pendingRequests] =
+    const [totalCollections, totalCollectors, totalRiders, activeVehicles, pendingRequests, weightResult] =
       await Promise.all([
         this.prisma.collection.count(),
         this.prisma.collector.count(),
         this.prisma.rider.count(),
         this.prisma.vehicle.count({ where: { status: 'ACTIVE' } }),
         this.prisma.collectionRequest.count({ where: { status: 'PENDING' } }),
+        this.prisma.collection.aggregate({
+          _sum: { weightKg: true },
+          where: {
+            collectionRequest: { status: 'COMPLETED' },
+          },
+        }),
       ]);
+
+    const totalCollectedWeightKg = weightResult._sum.weightKg
+      ? Number(weightResult._sum.weightKg)
+      : 0;
 
     return {
       totalCollections,
@@ -893,6 +903,7 @@ export class AdminService {
       totalRiders,
       activeVehicles,
       pendingRequests,
+      totalCollectedWeightKg,
     };
   }
 

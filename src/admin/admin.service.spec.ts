@@ -4,7 +4,7 @@ import { AdminService } from './admin.service';
 describe('AdminService – dashboard statistics', () => {
   let service: AdminService;
   let prisma: {
-    collection: { count: jest.Mock };
+    collection: { count: jest.Mock; aggregate: jest.Mock };
     collector: { count: jest.Mock };
     rider: { count: jest.Mock };
     vehicle: { count: jest.Mock };
@@ -13,7 +13,7 @@ describe('AdminService – dashboard statistics', () => {
 
   beforeEach(() => {
     prisma = {
-      collection: { count: jest.fn() },
+      collection: { count: jest.fn(), aggregate: jest.fn() },
       collector: { count: jest.fn() },
       rider: { count: jest.fn() },
       vehicle: { count: jest.fn() },
@@ -22,12 +22,15 @@ describe('AdminService – dashboard statistics', () => {
     service = new AdminService(prisma as never);
   });
 
-  it('returns the live dashboard statistics, including totalCollections', async () => {
+  it('returns the live dashboard statistics, including totalCollectedWeightKg', async () => {
     prisma.collection.count.mockResolvedValue(8);
     prisma.collector.count.mockResolvedValue(14);
     prisma.rider.count.mockResolvedValue(2);
     prisma.vehicle.count.mockResolvedValue(1);
     prisma.collectionRequest.count.mockResolvedValue(1);
+    prisma.collection.aggregate.mockResolvedValue({
+      _sum: { weightKg: { toString: () => '125.6' } },
+    });
 
     const result = await service.getDashboardStatistics();
 
@@ -40,13 +43,32 @@ describe('AdminService – dashboard statistics', () => {
     expect(prisma.collectionRequest.count).toHaveBeenCalledWith({
       where: { status: 'PENDING' },
     });
+    expect(prisma.collection.aggregate).toHaveBeenCalledWith({
+      _sum: { weightKg: true },
+      where: { collectionRequest: { status: 'COMPLETED' } },
+    });
     expect(result).toEqual({
       totalCollections: 8,
       totalCollectors: 14,
       totalRiders: 2,
       activeVehicles: 1,
       pendingRequests: 1,
+      totalCollectedWeightKg: 125.6,
     });
+  });
+
+  it('returns 0 totalCollectedWeightKg when there are no completed collections', async () => {
+    prisma.collection.count.mockResolvedValue(0);
+    prisma.collector.count.mockResolvedValue(14);
+    prisma.rider.count.mockResolvedValue(2);
+    prisma.vehicle.count.mockResolvedValue(1);
+    prisma.collectionRequest.count.mockResolvedValue(0);
+    prisma.collection.aggregate.mockResolvedValue({
+      _sum: { weightKg: null },
+    });
+
+    const result = await service.getDashboardStatistics();
+    expect(result.totalCollectedWeightKg).toBe(0);
   });
 
   it('reflects database changes in the count', async () => {
@@ -55,6 +77,9 @@ describe('AdminService – dashboard statistics', () => {
     prisma.rider.count.mockResolvedValue(2);
     prisma.vehicle.count.mockResolvedValue(1);
     prisma.collectionRequest.count.mockResolvedValue(1);
+    prisma.collection.aggregate.mockResolvedValue({
+      _sum: { weightKg: { toString: () => '0' } },
+    });
 
     expect((await service.getDashboardStatistics()).totalCollections).toBe(25);
     expect((await service.getDashboardStatistics()).totalCollections).toBe(26);
