@@ -231,8 +231,71 @@ describe('AdminService – getLeaderboard', () => {
 
     const result = await service.getLeaderboard('date', '2026-08-19');
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ date: '2026-08-19', data: [] });
     expect(prisma.collector.findMany).not.toHaveBeenCalled();
+  });
+
+  it('filters by date when date param is sent without period=date', async () => {
+    prisma.collection.groupBy.mockResolvedValue([]);
+
+    await service.getLeaderboard(undefined, '2026-08-24');
+
+    expect(prisma.collection.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          collectedAt: {
+            gte: new Date('2026-08-24T00:00:00.000Z'),
+            lt: new Date('2026-08-25T00:00:00.000Z'),
+          },
+        },
+      }),
+    );
+  });
+
+  it('returns wrapped {date, data} when date is provided', async () => {
+    prisma.collection.groupBy.mockResolvedValue([
+      {
+        collectorId: 'c1',
+        _count: { collectorId: 1 },
+        _sum: { weightKg: { toString: () => '5' } },
+      },
+    ]);
+    prisma.collector.findMany.mockResolvedValue([
+      { id: 'c1', fullName: 'Alice' },
+    ]);
+
+    const result = await service.getLeaderboard(undefined, '2026-08-24');
+
+    expect(result).toEqual({
+      date: '2026-08-24',
+      data: [
+        {
+          collectorId: 'c1',
+          fullName: 'Alice',
+          totalWeightKg: 5,
+          totalCollections: 1,
+          rank: 1,
+        },
+      ],
+    });
+  });
+
+  it('does not return all-time data when date param is a future date with no records', async () => {
+    prisma.collection.groupBy.mockResolvedValue([]);
+
+    const result = await service.getLeaderboard(undefined, '2099-12-31');
+
+    expect(result).toEqual({ date: '2099-12-31', data: [] });
+    expect(prisma.collection.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          collectedAt: {
+            gte: new Date('2099-12-31T00:00:00.000Z'),
+            lt: new Date('2100-01-01T00:00:00.000Z'),
+          },
+        },
+      }),
+    );
   });
 
   it('returns empty array when no collections exist', async () => {

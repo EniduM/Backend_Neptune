@@ -937,12 +937,16 @@ export class AdminService {
   async getLeaderboard(period?: string, date?: string) {
     const normalizedPeriod = this.normalizePeriod(period);
     const now = new Date();
+
     const dateRange =
-      normalizedPeriod === 'date'
+      date
         ? this.parseBusinessDate(date)
-        : undefined;
+        : normalizedPeriod === 'date'
+          ? this.parseBusinessDate(date)
+          : undefined;
+
     const since =
-      normalizedPeriod === 'month'
+      !date && normalizedPeriod === 'month'
         ? new Date(now.getFullYear(), now.getMonth(), 1)
         : undefined;
 
@@ -999,6 +1003,10 @@ export class AdminService {
         ...entry,
         rank: index + 1,
       }));
+
+    if (date) {
+      return { date, data: leaderboard };
+    }
 
     return leaderboard;
   }
