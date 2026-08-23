@@ -315,28 +315,30 @@ export class AdminService {
 
   async updateCollector(id: string, dto: UpdateCollectorDto) {
     await this.ensureCollectorExists(id);
-    const { loginId, password, nic, ...collectorData } = dto;
+    const { loginId, password, nic, universityId, ...collectorData } = dto;
 
     try {
       const passwordHash = password ? await argon2.hash(password) : undefined;
       const hasUserUpdate = loginId !== undefined || passwordHash !== undefined;
 
+      const data: Record<string, unknown> = {
+        ...collectorData,
+        ...(nic !== undefined ? { nic: normalizeNic(nic) } : {}),
+        ...(universityId !== undefined ? { universityId } : {}),
+      };
+
+      if (hasUserUpdate) {
+        data.user = {
+          update: {
+            ...(loginId !== undefined ? { loginId } : {}),
+            ...(passwordHash !== undefined ? { passwordHash } : {}),
+          },
+        };
+      }
+
       return await this.prisma.collector.update({
         where: { id },
-        data: {
-          ...collectorData,
-          ...(nic !== undefined ? { nic: normalizeNic(nic) } : {}),
-          ...(hasUserUpdate
-            ? {
-                user: {
-                  update: {
-                    ...(loginId !== undefined ? { loginId } : {}),
-                    ...(passwordHash !== undefined ? { passwordHash } : {}),
-                  },
-                },
-              }
-            : {}),
-        },
+        data,
         select: collectorSelect,
       });
     } catch (error) {
