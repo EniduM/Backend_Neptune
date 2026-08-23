@@ -935,20 +935,17 @@ export class AdminService {
   }
 
   async getLeaderboard(period?: string, date?: string) {
-    const normalizedPeriod = this.normalizePeriod(period);
     const now = new Date();
 
-    const dateRange =
-      date
-        ? this.parseBusinessDate(date)
-        : normalizedPeriod === 'date'
-          ? this.parseBusinessDate(date)
-          : undefined;
+    if (!date && this.normalizePeriod(period) === 'date') {
+      throw new BadRequestException('date is required when period=date');
+    }
 
-    const since =
-      !date && normalizedPeriod === 'month'
-        ? new Date(now.getFullYear(), now.getMonth(), 1)
-        : undefined;
+    const dateRange = date ? this.parseBusinessDate(date) : undefined;
+    const isMonth = !date && this.normalizePeriod(period) === 'month';
+    const since = isMonth
+      ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+      : undefined;
 
     const grouped = await this.prisma.collection.groupBy({
       by: ['collectorId'],
@@ -986,7 +983,7 @@ export class AdminService {
       collectors.map((collector) => [collector.id, collector.fullName]),
     );
 
-    const leaderboard = grouped
+    const data = grouped
       .map((entry) => ({
         collectorId: entry.collectorId,
         fullName: byName.get(entry.collectorId) ?? 'Unknown Collector',
@@ -1005,10 +1002,12 @@ export class AdminService {
       }));
 
     if (date) {
-      return { date, data: leaderboard };
+      return { period: 'date', date, data };
     }
-
-    return leaderboard;
+    if (isMonth) {
+      return { period: 'month', date: null, data };
+    }
+    return { period: 'all', date: null, data };
   }
 
   // ── University CRUD ──────────────────────────────────────────────
