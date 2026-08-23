@@ -174,7 +174,7 @@ model Collection {
   collectorId         String   @map("collector_id") @db.Uuid
   riderId             String   @map("rider_id") @db.Uuid
   vehicleId           String   @map("vehicle_id") @db.Uuid
-  weightKg            Decimal  @map("weight_kg") @db.Decimal(10, 2)
+  weightKg            Decimal  @map("weight_kg") @db.Decimal(10, 3)
   collectedAt         DateTime @map("collected_at")
 
   collectionRequest CollectionRequest? @relation(fields: [collectionRequestId], references: [id], onDelete: Restrict)
