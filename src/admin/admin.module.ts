@@ -10,6 +10,8 @@ import { LeaderboardController } from './leaderboard.controller';
 import { DashboardController } from './dashboard.controller';
 import { ReportsController } from './reports.controller';
 import { ReportsService } from './reports.service';
+import { UniversitiesController } from './universities.controller';
+import { UniversityDistributionController } from './university-distribution.controller';
 
 @Module({
   controllers: [
@@ -22,6 +24,8 @@ import { ReportsService } from './reports.service';
     LeaderboardController,
     DashboardController,
     ReportsController,
+    UniversitiesController,
+    UniversityDistributionController,
   ],
   providers: [AdminService, ReportsService],
 })

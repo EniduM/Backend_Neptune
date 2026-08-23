@@ -20,6 +20,15 @@ import { UpdateVehicleStatusDto } from './dto/update-vehicle-status.dto';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
 import { normalizeNic } from '../common/validators/nic.util';
 import { UpdateAssignmentDto } from './dto/update-assignment.dto';
+import { CreateUniversityDto } from './dto/create-university.dto';
+import { UpdateUniversityDto } from './dto/update-university.dto';
+
+const universitySelect = {
+  id: true,
+  name: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 const collectorSelect = {
   id: true,
@@ -30,8 +39,12 @@ const collectorSelect = {
   guardianName: true,
   guardianMobile: true,
   qrToken: true,
+  universityId: true,
   createdAt: true,
   updatedAt: true,
+  university: {
+    select: universitySelect,
+  },
   user: {
     select: {
       id: true,
@@ -257,6 +270,7 @@ export class AdminService {
               guardianName: dto.guardianName,
               guardianMobile: dto.guardianMobile,
               qrToken: dto.qrToken ?? this.generateQrToken(),
+              ...(dto.universityId ? { universityId: dto.universityId } : {}),
             },
           },
         },
@@ -832,6 +846,17 @@ export class AdminService {
     }
   }
 
+  private async ensureUniversityExists(id: string) {
+    const university = await this.prisma.university.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!university) {
+      throw new NotFoundException('University not found');
+    }
+  }
+
   private toAssignmentDate(value: string): Date {
     return new Date(`${value}T00:00:00.000Z`);
   }
@@ -976,6 +1001,135 @@ export class AdminService {
     return leaderboard;
   }
 
+  // ── University CRUD ──────────────────────────────────────────────
+
+  async createUniversity(dto: CreateUniversityDto) {
+    try {
+      return await this.prisma.university.create({
+        data: { name: dto.name.trim() },
+        select: universitySelect,
+      });
+    } catch (error) {
+      this.handleDatabaseError(error, 'University');
+    }
+  }
+
+  async findAllUniversities() {
+    return this.prisma.university.findMany({
+      select: universitySelect,
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async findUniversity(id: string) {
+    const university = await this.prisma.university.findUnique({
+      where: { id },
+      select: universitySelect,
+    });
+
+    if (!university) {
+      throw new NotFoundException('University not found');
+    }
+
+    return university;
+  }
+
+  async updateUniversity(id: string, dto: UpdateUniversityDto) {
+    await this.ensureUniversityExists(id);
+
+    try {
+      return await this.prisma.university.update({
+        where: { id },
+        data: { name: dto.name.trim() },
+        select: universitySelect,
+      });
+    } catch (error) {
+      this.handleDatabaseError(error, 'University');
+    }
+  }
+
+  async deleteUniversity(id: string) {
+    await this.ensureUniversityExists(id);
+
+    const linkedCollectors = await this.prisma.collector.count({
+      where: { universityId: id },
+    });
+
+    if (linkedCollectors > 0) {
+      throw new ConflictException(
+        'Cannot delete university: it is linked to existing collectors',
+      );
+    }
+
+    return this.prisma.university.delete({
+      where: { id },
+      select: universitySelect,
+    });
+  }
+
+  // ── University Distribution ──────────────────────────────────────
+
+  async getUniversityDistribution(date: string) {
+    if (!date) {
+      throw new BadRequestException('date query parameter is required');
+    }
+
+    const dateRange = this.parseBusinessDate(date)!;
+
+    const collections = await this.prisma.collection.findMany({
+      where: {
+        collectedAt: { gte: dateRange.start, lt: dateRange.end },
+      },
+      select: {
+        collector: {
+          select: { universityId: true },
+        },
+      },
+    });
+
+    const total = collections.length;
+
+    if (total === 0) {
+      return { date, total: 0, distribution: [] };
+    }
+
+    const countByUniversity = new Map<string, number>();
+    for (const c of collections) {
+      const uid = c.collector.universityId;
+      const key = uid ?? '__none__';
+      countByUniversity.set(key, (countByUniversity.get(key) ?? 0) + 1);
+    }
+
+    const universityIds = [...countByUniversity.keys()].filter(
+      (k) => k !== '__none__',
+    );
+
+    const universities = universityIds.length
+      ? await this.prisma.university.findMany({
+          where: { id: { in: universityIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+
+    const uniMap = new Map(universities.map((u) => [u.id, u.name]));
+
+    const distribution = [...countByUniversity.entries()]
+      .map(([universityId, count]) => ({
+        universityId: universityId === '__none__' ? null : universityId,
+        universityName:
+          universityId === '__none__'
+            ? 'Unassigned'
+            : (uniMap.get(universityId) ?? 'Unknown'),
+        count,
+        percentage: Math.round((count / total) * 10000) / 100,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    return { date, total, distribution };
+  }
+
+  // ── Private helpers ──────────────────────────────────────────────
+
   private normalizePeriod(period?: string): 'month' | 'date' | 'all' {
     const normalized = String(period ?? 'all').toLowerCase();
     if (normalized === 'month') {
@@ -1020,7 +1174,7 @@ export class AdminService {
 
   private handleDatabaseError(
     error: unknown,
-    entity: 'Collector' | 'Rider' | 'Vehicle' | 'Assignment',
+    entity: 'Collector' | 'Rider' | 'Vehicle' | 'Assignment' | 'University',
   ): never {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -1041,6 +1195,9 @@ export class AdminService {
       }
       if (target.includes('vehicle')) {
         throw new ConflictException('vehicleCode already exists');
+      }
+      if (target.includes('name') && entity === 'University') {
+        throw new ConflictException('University name already exists');
       }
       if (
         entity === 'Assignment' &&
