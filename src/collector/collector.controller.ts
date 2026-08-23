@@ -13,6 +13,8 @@ import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { ActiveAccountGuard } from '../auth/active-account.guard';
+import { RequireActiveAccount } from '../auth/active-account.decorator';
 import { CollectorService } from './collector.service';
 import { CreateCollectionRequestDto } from './dto/create-collection-request.dto';
 
@@ -35,6 +37,8 @@ export class CollectorController {
   }
 
   @Post('collection-requests')
+  @RequireActiveAccount()
+  @UseGuards(ActiveAccountGuard)
   createCollectionRequest(
     @Req() request: Request,
     @Body() dto: CreateCollectionRequestDto,
@@ -56,6 +60,8 @@ export class CollectorController {
   }
 
   @Patch('collection-requests/:id/cancel')
+  @RequireActiveAccount()
+  @UseGuards(ActiveAccountGuard)
   cancelCollectionRequest(@Req() request: Request, @Param('id') id: string) {
     const user = request.user as { id: string };
     return this.collectorService.cancelCollectionRequest(user.id, id);

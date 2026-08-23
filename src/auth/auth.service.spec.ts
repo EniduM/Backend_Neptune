@@ -66,7 +66,7 @@ describe('AuthService', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should throw UnauthorizedException for INACTIVE user', async () => {
+    it('should allow INACTIVE user to log in (feature-level restriction applied elsewhere)', async () => {
       const argon2 = require('argon2');
       const hash = await argon2.hash('password123');
 
@@ -78,9 +78,8 @@ describe('AuthService', () => {
         status: 'INACTIVE',
       });
 
-      await expect(
-        service.login('INACTIVE_USER', 'password123'),
-      ).rejects.toThrow(UnauthorizedException);
+      const result = await service.login('INACTIVE_USER', 'password123');
+      expect(result.user.status).toBe('INACTIVE');
     });
 
     it('should throw UnauthorizedException for wrong password', async () => {

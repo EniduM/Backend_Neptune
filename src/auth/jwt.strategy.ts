@@ -19,8 +19,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       select: { id: true, loginId: true, role: true, status: true },
     });
 
-    if (!user || user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Account is deactivated');
+    if (!user) {
+      throw new UnauthorizedException('Account not found');
     }
 
     return {
