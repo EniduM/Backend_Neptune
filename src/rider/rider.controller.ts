@@ -14,6 +14,8 @@ import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { ActiveAccountGuard } from '../auth/active-account.guard';
+import { RequireActiveAccount } from '../auth/active-account.decorator';
 import { CompleteCollectionRequestDto } from './dto/complete-collection-request.dto';
 import { VerifyQrTokenDto } from './dto/verify-qr-token.dto';
 import { RiderService } from './rider.service';
@@ -43,12 +45,16 @@ export class RiderController {
   }
 
   @Patch('collection-requests/:id/accept')
+  @RequireActiveAccount()
+  @UseGuards(ActiveAccountGuard)
   acceptRequest(@Req() request: Request, @Param('id') id: string) {
     const user = request.user as { id: string };
     return this.riderService.acceptRequest(user.id, id);
   }
 
   @Post('collection-requests/:id/complete')
+  @RequireActiveAccount()
+  @UseGuards(ActiveAccountGuard)
   completeRequest(
     @Req() request: Request,
     @Param('id') id: string,
@@ -60,6 +66,8 @@ export class RiderController {
 
   @Post('collection-requests/:id/verify-qr-token')
   @HttpCode(HttpStatus.OK)
+  @RequireActiveAccount()
+  @UseGuards(ActiveAccountGuard)
   verifyQrToken(
     @Req() request: Request,
     @Param('id') id: string,

@@ -36,7 +36,7 @@ describe('JwtStrategy', () => {
     });
   });
 
-  it('rejects a deactivated account even with a valid token', async () => {
+  it('allows a deactivated account to authenticate (feature-level restriction applied elsewhere)', async () => {
     prisma.user.findUnique.mockResolvedValue({
       id: 'u1',
       loginId: 'CT01',
@@ -46,7 +46,12 @@ describe('JwtStrategy', () => {
 
     await expect(
       strategy.validate({ sub: 'u1', loginId: 'CT01', role: 'COLLECTOR' }),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+    ).resolves.toEqual({
+      id: 'u1',
+      loginId: 'CT01',
+      role: 'COLLECTOR',
+      status: 'INACTIVE',
+    });
   });
 
   it('rejects a user that no longer exists', async () => {
